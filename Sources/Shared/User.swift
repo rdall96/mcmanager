@@ -78,8 +78,9 @@ extension User: Codable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(id, forKey: .id)
         try container.encode(username, forKey: .username)
-        try container.encode(createdAt.timeIntervalSince1970, forKey: .createdAt)
-        try container.encode(updatedAt.timeIntervalSince1970, forKey: .updatedAt)
+        // Swift's Date object also adds milliseconds to the encoding, cast the time intervals to UInt to drop it
+        try container.encode(UInt(createdAt.timeIntervalSince1970), forKey: .createdAt)
+        try container.encode(UInt(updatedAt.timeIntervalSince1970), forKey: .updatedAt)
         try container.encode(isAdmin, forKey: .isAdmin)
     }
 }

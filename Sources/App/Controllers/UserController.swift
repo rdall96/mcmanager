@@ -11,7 +11,7 @@ import Shared
 
 struct UserController: RouteCollection {
     func boot(routes: RoutesBuilder) throws {
-        let users = routes.grouped("users").grouped(UserAuthenticator())
+        let users = routes.grouped("users")
         users.get(use: all)
         users.get("profile", use: me)
         users.post(use: create)
@@ -27,12 +27,6 @@ struct UserController: RouteCollection {
     }
 
     func create(req: Request) async throws -> User {
-        // can only create if the authenticated user is an admin
-        let authUser = try req.auth.require(User.self)
-        guard authUser.isAdmin else {
-            throw Abort(.forbidden)
-        }
-        
         let userRequest = try req.content.decode(User.self)
         // This new user will now need its password encrypted before saving
         let user = User(
@@ -50,19 +44,14 @@ struct UserController: RouteCollection {
     }
     
     func me(req: Request) async throws -> User {
-        try req.auth.require(User.self)
+        // TODO: Add user profile route when authentication is done
+        throw Abort(.notImplemented)
     }
     
     func update(req: Request) async throws -> User {
         let userRequest = try req.content.decode(User.self)
         guard let user = try await User.find(req.parameters.get("userID"), on: req.db)
         else { throw Abort(.notFound) }
-        
-        // can only delete if the authenticated user is self or an admin
-        let authUser = try req.auth.require(User.self)
-        guard authUser.id == user.id || authUser.isAdmin else {
-            throw Abort(.forbidden)
-        }
         
         // password
         if !userRequest.password.isEmpty {
@@ -79,12 +68,6 @@ struct UserController: RouteCollection {
     func delete(req: Request) async throws -> HTTPStatus {
         guard let user = try await User.find(req.parameters.get("userID"), on: req.db) else {
             throw Abort(.notFound)
-        }
-        
-        // can only delete if the authenticated user is self or an admin
-        let authUser = try req.auth.require(User.self)
-        guard authUser.id == user.id || authUser.isAdmin else {
-            throw Abort(.forbidden)
         }
         
         try await user.delete(on: req.db)
