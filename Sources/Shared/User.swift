@@ -35,11 +35,12 @@ public final class User: Model {
     
     public init() {}
     
+    @_spi(MCManager_Server)
     public init(
-        id: UUID? = UUID(),
+        id: UUID,
         username: String,
         password: String,
-        isAdmin: Bool = false
+        isAdmin: Bool
     ) {
         self.id = id
         self.username = username
@@ -47,6 +48,15 @@ public final class User: Model {
         self.createdAt = .now
         self.updatedAt = .now
         self.isAdmin = isAdmin
+    }
+    
+    public convenience init(username: String, password: String) {
+        self.init(
+            id: UUID(),
+            username: username,
+            password: password,
+            isAdmin: false
+        )
     }
 }
 
@@ -67,7 +77,6 @@ extension User: Codable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         // we don't decode the id and the dates since those get updated internally
         self.init(
-            id: nil,
             username: try container.decodeIfPresent(String.self, forKey: .username) ?? "",
             password: try container.decodeIfPresent(String.self, forKey: .password) ?? ""
         )
@@ -78,9 +87,8 @@ extension User: Codable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(id, forKey: .id)
         try container.encode(username, forKey: .username)
-        // Swift's Date object also adds milliseconds to the encoding, cast the time intervals to UInt to drop it
-        try container.encode(UInt(createdAt.timeIntervalSince1970), forKey: .createdAt)
-        try container.encode(UInt(updatedAt.timeIntervalSince1970), forKey: .updatedAt)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(updatedAt, forKey: .updatedAt)
         try container.encode(isAdmin, forKey: .isAdmin)
     }
 }

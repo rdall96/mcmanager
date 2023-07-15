@@ -7,7 +7,7 @@
 
 import Fluent
 import Vapor
-import Shared
+@_spi(MCManager_Server) import Shared
 
 extension User: Content {}
 
@@ -44,7 +44,7 @@ extension User {
 extension User {
     static var admin: User {
         let user = User(
-            id: UUID(uuidString: "7a3a593c-8fd0-4906-a11b-6a8054cf4ac9"),
+            id: UUID(uuidString: "7a3a593c-8fd0-4906-a11b-6a8054cf4ac9")!,
             username: "admin",
             password: "mcmanager",
             isAdmin: true

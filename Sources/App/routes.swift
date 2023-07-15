@@ -18,7 +18,7 @@ fileprivate struct API: RouteCollection {
             Version.current.description
         }
         
-        // users
         try api.register(collection: UserController())
+        try api.register(collection: ServerController())
     }
 }

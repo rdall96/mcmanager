@@ -70,6 +70,7 @@ fileprivate func migrateDatabase(_ app: Application) async throws {
     // Add database migrations
     app.migrations.add(User.Migration())
     app.migrations.add(SessionToken.Migration())
+    app.migrations.add(Server.Migration())
     
     // Migrate database
     try await app.autoMigrate()
