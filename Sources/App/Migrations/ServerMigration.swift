@@ -13,12 +13,12 @@ extension Server {
         func prepare(on database: Database) async throws {
             try await database.schema(Server.schema)
                 .id()
-                .field("name", .string, .required)
-                .field("type", .string, .required)
-                .field("version", .string, .required)
-                .field("port", .uint32, .required)
-                .field("created_at", .datetime, .required)
-                .field("updated_at", .datetime, .required)
+                .field(Server.FieldKeys.name.rawValue, .string, .required)
+                .field(Server.FieldKeys.type.rawValue, .string, .required)
+                .field(Server.FieldKeys.version.rawValue, .string, .required)
+                .field(Server.FieldKeys.port.rawValue, .uint32, .required)
+                .field(Server.FieldKeys.created_at.rawValue, .datetime, .required)
+                .field(Server.FieldKeys.updated_at.rawValue, .datetime, .required)
                 .create()
         }
         

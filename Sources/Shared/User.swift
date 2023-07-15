@@ -9,6 +9,14 @@ import Fluent
 
 public final class User: Model {
     public static let schema = "users"
+
+    private enum FieldKeys: FieldKey {
+        case username
+        case password
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case isAdmin = "is_admin"
+    }
     
     // MARK: - Members
     

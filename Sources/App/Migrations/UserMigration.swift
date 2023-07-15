@@ -13,12 +13,12 @@ extension User {
         func prepare(on database: Database) async throws {
             try await database.schema(User.schema)
                 .id()
-                .field("username", .string, .required)
-                .unique(on: "username")
-                .field("password", .string, .required)
-                .field("created_at", .datetime, .required)
-                .field("updated_at", .datetime, .required)
-                .field("is_admin", .bool, .required)
+                .field(User.FieldKeys.username.rawValue, .string, .required)
+                .unique(on: User.FieldKeys.username.rawValue)
+                .field(User.FieldKeys.password.rawValue, .string, .required)
+                .field(User.FieldKeys.created_at.rawValue, .datetime, .required)
+                .field(User.FieldKeys.updated_at.rawValue, .datetime, .required)
+                .field(User.FieldKeys.is_admin.rawValue, .bool, .required)
                 .create()
         }
         
