@@ -4,21 +4,38 @@ import PackageDescription
 let package = Package(
     name: "MCManager",
     platforms: [
-       .macOS(.v12)
+        .macOS(.v12)
     ],
     dependencies: [
-        // 💧 A server-side Swift web framework.
+        // Web framework: Vapor
         .package(url: "https://github.com/vapor/vapor.git", from: "4.76.0"),
+        // SQLite database management
         .package(url: "https://github.com/vapor/fluent.git", from: "4.8.0"),
         .package(url: "https://github.com/vapor/fluent-sqlite-driver.git", from: "4.0.0"),
+        // JWT for authentication
+        .package(url: "https://github.com/vapor/jwt.git", from: "4.2.2"),
     ],
     targets: [
-        .executableTarget(
-            name: "App",
+        // Shared data model
+        .target(
+            name: "Shared",
             dependencies: [
                 .product(name: "Fluent", package: "fluent"),
                 .product(name: "FluentSQLiteDriver", package: "fluent-sqlite-driver"),
-                .product(name: "Vapor", package: "vapor")
+            ]
+        ),
+        .testTarget(name: "SharedTests", dependencies: [
+            .target(name: "Shared")
+        ]),
+        // Web server
+        .executableTarget(
+            name: "App",
+            dependencies: [
+                .target(name: "Shared"),
+                .product(name: "Fluent", package: "fluent"),
+                .product(name: "FluentSQLiteDriver", package: "fluent-sqlite-driver"),
+                .product(name: "Vapor", package: "vapor"),
+                .product(name: "JWT", package: "jwt"),
             ],
             swiftSettings: [
                 // Enable better optimizations when building in Release configuration. Despite the use of

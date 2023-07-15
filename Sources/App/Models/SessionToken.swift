@@ -1,0 +1,85 @@
+//
+//  SessionToken.swift
+//
+//
+//  Created by Ricky Dall'Armellina on 7/14/23.
+//
+
+import Fluent
+import JWT
+import Vapor
+
+import Shared
+
+final class SessionToken: Model, Content {
+    static let schema = "tokens"
+    
+    @ID(key: .id)
+    var id: UUID?
+    
+    @Field(key: "sub")
+    var sub: SubjectClaim
+    
+    @Parent(key: "user_id")
+    var user: User
+    
+    @Field(key: "admin")
+    var admin: Bool
+    
+    @Field(key: "iat")
+    var iat: IssuedAtClaim
+    
+    @Field(key: "exp")
+    var exp: ExpirationClaim
+    
+    init() {}
+    
+    init(
+        id: UUID = UUID(),
+        sub: SubjectClaim,
+        userId: UUID,
+        admin: Bool,
+        iat: IssuedAtClaim,
+        exp: ExpirationClaim
+    ) {
+        self.id = id
+        self.sub = sub
+        self.$user.id = userId
+        self.admin = admin
+        self.iat = iat
+        self.exp = exp
+    }
+}
+
+extension SessionToken {
+    /// Create a new token for the given user
+    static func token(for user: User) -> SessionToken? {
+        guard let userId = user.id else { return nil }
+        let currentDate: Date = .now
+        let expirationDate = currentDate.addingTimeInterval(1 * 24 * 60 * 60) // 1 day
+        return .init(
+            sub: .init(value: "mcmanager"),
+            userId: userId,
+            admin: user.isAdmin,
+            iat: .init(value: currentDate),
+            exp: .init(value: expirationDate)
+        )
+    }
+}
+
+// MARK: - Equatable
+extension SessionToken: Equatable {
+    static func == (lhs: SessionToken, rhs: SessionToken) -> Bool {
+        lhs.id == rhs.id &&
+        lhs.user.id == rhs.user.id &&
+        lhs.iat.value == rhs.iat.value &&
+        lhs.exp.value == rhs.exp.value
+    }
+}
+
+// MARK: - JWTPayload
+extension SessionToken: JWTPayload {
+    func verify(using signer: JWTSigner) throws {
+        try self.exp.verifyNotExpired()
+    }
+}

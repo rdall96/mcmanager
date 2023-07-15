@@ -57,21 +57,21 @@ RUN export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true \
       # libxml2 \
     && rm -r /var/lib/apt/lists/*
 
-# Create a vapor user and group with /app as its home directory
-RUN useradd --user-group --create-home --system --skel /dev/null --home-dir /app vapor
+# Create an mcmanager user and group with /app as its home directory
+RUN useradd --user-group --create-home --system --skel /dev/null --home-dir /app mcmanager
 
 # Switch to the new home directory
 WORKDIR /app
 
 # Copy built executable and any staged resources from builder
-COPY --from=build --chown=vapor:vapor /staging /app
+COPY --from=build --chown=mcmanager:mcmanager /staging /app
 
-# Ensure all further commands run as the vapor user
-USER vapor:vapor
+# Ensure all further commands run as the mcmanager user
+USER mcmanager:mcmanager
 
-# Let Docker bind to port 8080
-EXPOSE 8080
+# Let Docker bind to port 8000
+EXPOSE 8000
 
-# Start the Vapor service when the image is run, default to listening on 8080 in production environment
+# Start the service when the image is run, default to listening on 8000 in production environment
 ENTRYPOINT ["./App"]
-CMD ["serve", "--env", "production", "--hostname", "0.0.0.0", "--port", "8080"]
+CMD ["serve", "--env", "production", "--hostname", "0.0.0.0", "--port", "8000"]
