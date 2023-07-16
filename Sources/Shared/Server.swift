@@ -137,13 +137,7 @@ extension Server {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             
-            if let status = try? container.decode(Status.self, forKey: .status) {
-                self.status = status
-            }
-            else {
-                self.status = .unknown
-            }
-            
+            status = try container.decodeIfPresent(Status.self, forKey: .status) ?? .unknown
             onlinePlayerCount = try? container.decode(Int.self, forKey: .onlinePlayerCount)
             cpuUsage = try? container.decode(Double.self, forKey: .cpuUsage)
             memoryUsageBytes = try? container.decode(Int.self, forKey: .memoryUsageBytes)
@@ -181,20 +175,14 @@ extension Server {
         public init(from decoder: Decoder) throws {
             if let bool = try? decoder.singleValueContainer().decode(Bool.self) {
                 self = .flag(bool)
-                return
             }
-            
-            if let int = try? decoder.singleValueContainer().decode(Int.self) {
+            else if let int = try? decoder.singleValueContainer().decode(Int.self) {
                 self = .number(int)
-                return
-            }
-            
-            if let string = try? decoder.singleValueContainer().decode(String.self) {
-                self = .text(string)
-                return
             }
             else {
-                self = .text("")
+                self = .text(
+                    try? decoder.singleValueContainer().decode(String.self) ?? ""
+                )
             }
         }
         

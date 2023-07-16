@@ -23,20 +23,20 @@ public final class User: Model {
     @ID(key: .id)
     public var id: UUID?
     
-    @Field(key: "username")
+    @Field(key: FieldKeys.username.rawValue)
     public var username: String
     
     // this is the password has for the data model, but it's also used as a plain text password when creating new users
-    @Field(key: "password")
+    @Field(key: FieldKeys.password.rawValue)
     public var password: String
     
-    @Field(key: "created_at")
+    @Field(key: FieldKeys.createdAt.rawValue)
     public var createdAt: Date
     
-    @Field(key: "updated_at")
+    @Field(key: FieldKeys.updatedAt.rawValue)
     public var updatedAt: Date
     
-    @Field(key: "is_admin")
+    @Field(key: FieldKeys.isAdmin.rawValue)
     public var isAdmin: Bool
     
     // MARK: - Initializers
