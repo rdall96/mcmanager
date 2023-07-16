@@ -12,11 +12,11 @@ extension SessionToken {
         func prepare(on database: Database) async throws {
             try await database.schema(SessionToken.schema)
                 .id()
-                .field("sub", .string, .required)
-                .field("user_id", .uuid, .references("users", "id"))
-                .field("admin", .bool, .required)
-                .field("iat", .datetime, .required)
-                .field("exp", .datetime, .required)
+                .field(SessionToken.FieldKeys.subject.rawValue, .string, .required)
+                .field(SessionToken.FieldKeys.userId.rawValue, .uuid, .references("users", "id"))
+                .field(SessionToken.FieldKeys.admin.rawValue, .bool, .required)
+                .field(SessionToken.FieldKeys.issuedAt.rawValue, .datetime, .required)
+                .field(SessionToken.FieldKeys.expiresAt.rawValue, .datetime, .required)
                 .create()
         }
         

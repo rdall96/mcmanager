@@ -27,11 +27,20 @@ let package = Package(
         .testTarget(name: "SharedTests", dependencies: [
             .target(name: "Shared")
         ]),
+        // Tools & utilities
+        .target(
+            name: "Utilities",
+            dependencies: []
+        ),
+        .testTarget(name: "UtilitiesTests", dependencies: [
+            .target(name: "Utilities")
+        ]),
         // Web server
         .executableTarget(
             name: "App",
             dependencies: [
                 .target(name: "Shared"),
+                .target(name: "Utilities"),
                 .product(name: "Fluent", package: "fluent"),
                 .product(name: "FluentSQLiteDriver", package: "fluent-sqlite-driver"),
                 .product(name: "Vapor", package: "vapor"),

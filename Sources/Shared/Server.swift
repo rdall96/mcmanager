@@ -10,9 +10,11 @@ import Fluent
 
 // MARK: - Server
 public final class Server: Model {
+    @_spi(MCManager_Server)
     public static let schema = "servers"
     
-    private enum FieldKeys: FieldKey {
+    @_spi(MCManager_Server)
+    public enum FieldKeys: FieldKey {
         case name
         case type
         case version

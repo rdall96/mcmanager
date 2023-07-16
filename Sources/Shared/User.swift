@@ -8,9 +8,11 @@
 import Fluent
 
 public final class User: Model {
+    @_spi(MCManager_Server)
     public static let schema = "users"
 
-    private enum FieldKeys: FieldKey {
+    @_spi(MCManager_Server)
+    public enum FieldKeys: FieldKey {
         case username
         case password
         case createdAt = "created_at"

@@ -13,23 +13,31 @@ import Shared
 
 final class SessionToken: Model, Content {
     static let schema = "tokens"
+
+    enum FieldKeys: FieldKey {
+        case subject
+        case userId = "user_id"
+        case admin
+        case issuedAt
+        case expiresAt
+    }
     
     @ID(key: .id)
     var id: UUID?
     
-    @Field(key: "sub")
+    @Field(key: FieldKeys.subject.rawValue)
     var sub: SubjectClaim
     
-    @Parent(key: "user_id")
+    @Parent(key: FieldKeys.userId.rawValue)
     var user: User
     
-    @Field(key: "admin")
+    @Field(key: FieldKeys.admin.rawValue)
     var admin: Bool
     
-    @Field(key: "iat")
+    @Field(key: FieldKeys.issuedAt.rawValue)
     var iat: IssuedAtClaim
     
-    @Field(key: "exp")
+    @Field(key: FieldKeys.expiresAt.rawValue)
     var exp: ExpirationClaim
     
     init() {}
