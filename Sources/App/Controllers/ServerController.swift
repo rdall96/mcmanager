@@ -10,16 +10,16 @@ import Vapor
 @_spi(MCManager_Server) import MCManager_Shared
 
 struct ServerController: RouteCollection {
-    typealias MCServer = Shared.Server
+    typealias MCServer = MCManager_Shared.Server
     
     func boot(routes: RoutesBuilder) throws {
         let servers = routes.grouped("servers")
-        servers.get(use: all)
-        servers.post(use: create)
+//        servers.get(use: all)
+//        servers.post(use: create)
         servers.group(":serverID") { server in
-            server.get(use: self.server(req:))
-            server.put(use: update)
-            server.delete(use: delete)
+//            server.get(use: self.server(req:))
+//            server.put(use: update)
+//            server.delete(use: delete)
         }
     }
     

@@ -37,7 +37,7 @@ public final class Server: Model {
     public var version: String
     
     @Field(key: FieldKeys.port.rawValue)
-    public var port: UInt32
+    public var port: UInt16
     
     @Field(key: FieldKeys.createdAt.rawValue)
     public var createdAt: Date
@@ -53,7 +53,7 @@ public final class Server: Model {
         name: String,
         type: ServerType,
         version: String,
-        port: UInt32
+        port: UInt16
     ) {
         self.id = id
         self.name = name
@@ -68,7 +68,7 @@ public final class Server: Model {
         name: String,
         type: ServerType,
         version: String,
-        port: UInt32
+        port: UInt16
     ) {
         self.init(
             id: UUID(),
@@ -98,7 +98,7 @@ extension Server: Codable {
             name: try container.decodeIfPresent(String.self, forKey: .name) ?? "",
             type: try container.decodeIfPresent(ServerType.self, forKey: .type) ?? .java,
             version: try container.decodeIfPresent(String.self, forKey: .version) ?? "",
-            port: try container.decodeIfPresent(UInt32.self, forKey: .port) ?? 0
+            port: try container.decodeIfPresent(UInt16.self, forKey: .port) ?? 0
         )
     }
 }
@@ -130,19 +130,32 @@ extension Server {
     public struct Info: Codable {
         public let status: Status
         /// Number of active players on the server
-        public let onlinePlayerCount: Int?
+        public let onlinePlayerCount: UInt?
         /// CPU usage for the server process
-        public let cpuUsage: Double?
+        public let cpuUsage: UInt64
         /// Memory usage (bytes) for the server process
-        public let memoryUsageBytes: Int?
+        public let memoryUsageBytes: UInt64
+        
+        @_spi(MCManager_Runtime)
+        public init(
+            status: Status,
+            onlinePlayerCount: UInt = 0,
+            cpuUsage: UInt64 = 0,
+            memoryUsage: UInt64 = 0
+        ) {
+            self.status = status
+            self.onlinePlayerCount = onlinePlayerCount
+            self.cpuUsage = cpuUsage
+            self.memoryUsageBytes = memoryUsage
+        }
         
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             
             status = try container.decodeIfPresent(Status.self, forKey: .status) ?? .unknown
-            onlinePlayerCount = try? container.decode(Int.self, forKey: .onlinePlayerCount)
-            cpuUsage = try? container.decode(Double.self, forKey: .cpuUsage)
-            memoryUsageBytes = try? container.decode(Int.self, forKey: .memoryUsageBytes)
+            onlinePlayerCount = try? container.decode(UInt.self, forKey: .onlinePlayerCount)
+            cpuUsage = try container.decode(UInt64.self, forKey: .cpuUsage)
+            memoryUsageBytes = try container.decode(UInt64.self, forKey: .memoryUsageBytes)
         }
         
         enum CodingKeys: String, CodingKey {
@@ -155,22 +168,42 @@ extension Server {
     }
 }
 
-// MARK: - BuilderInfo
+// MARK: - Supported Runtimes
 extension Server {
     /**
      Data regarding the types and game versions that can be used to create a server.
      This should be used a reference before calling `createServer`.
      */
-    public struct BuilderInfo: Codable {
+    public struct RuntimeSupport: Codable {
         public let type: ServerType
         public let versions: [String]
+        
+        @_spi(MCManager_Runtime)
+        public init(type: ServerType, versions: [String]) {
+            self.type = type
+            self.versions = versions
+        }
     }
 }
 
 // MARK: - Properties
 extension Server {
+    /// Represents a single server config value (aka: server property)
+    public struct Config: Codable, Hashable, Identifiable {
+        public let id: String
+        public var value: Value
+        
+        public static func == (lhs: Server.Config, rhs: Server.Config) -> Bool {
+            // we only check the id since two objects with the same name cannot exist in the same list,
+            // and therefore they should override each other
+            lhs.id == rhs.id
+        }
+    }
+}
+
+extension Server.Config {
     /// Represents the actual value of any server property since it can be of any primitive type
-    public enum PropertyValue: Codable {
+    public enum Value: Codable, Hashable {
         
         case flag(Bool), number(Int), text(String)
         
@@ -183,7 +216,7 @@ extension Server {
             }
             else {
                 self = .text(
-                    try? decoder.singleValueContainer().decode(String.self) ?? ""
+                    (try? decoder.singleValueContainer().decode(String.self)) ?? ""
                 )
             }
         }
@@ -200,7 +233,7 @@ extension Server {
         /// A textual representation of the underlying value
         public var description: String {
             switch self {
-            case .flag(let bool): return bool.description
+            case .flag(let bool): return bool.description.lowercased()
             case .number(let int): return int.description
             case .text(let string): return string
             }

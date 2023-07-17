@@ -4,7 +4,7 @@ import PackageDescription
 let package = Package(
     name: "MCManager",
     platforms: [
-        .macOS(.v12)
+        .macOS(.v13)
     ],
     dependencies: [
         // Web framework: Vapor
@@ -15,7 +15,9 @@ let package = Package(
         // JWT for authentication
         .package(url: "https://github.com/vapor/jwt.git", from: "4.2.2"),
         // Docker client
-        .package(url: "https://github.com/m-barthelemy/DockerSwift.git", exact: .init(stringLiteral: "1.41.0-beta10"))
+        .package(url: "https://github.com/m-barthelemy/DockerSwift.git", exact: .init(stringLiteral: "1.41.0-beta10")),
+        // Swift commands
+        .package(url: "https://github.com/qiuzhifei/swift-commands", from: "0.6.0"),
     ],
     targets: [
         
@@ -31,7 +33,7 @@ let package = Package(
         .testTarget(
             name: "MCManager-SharedTests",
             dependencies: [
-                .target(name: "MCManager-Shared")
+                .target(name: "MCManager-Shared"),
             ],
             path: "Tests/SharedTests"
         ),
@@ -42,12 +44,13 @@ let package = Package(
             dependencies: [
                 .target(name: "MCManager-Shared"),
                 .product(name: "DockerSwift", package: "DockerSwift"),
+                .product(name: "Commands", package: "swift-commands"),
             ]
         ),
         .testTarget(
             name: "MinecraftRuntimeTests",
             dependencies: [
-                .target(name: "MinecraftRuntime")
+                .target(name: "MinecraftRuntime"),
             ]
         ),
         

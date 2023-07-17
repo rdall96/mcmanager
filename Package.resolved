@@ -172,6 +172,15 @@
       }
     },
     {
+      "identity" : "swift-commands",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/qiuzhifei/swift-commands",
+      "state" : {
+        "revision" : "0883a0383038c41b398945b2e6fd233baaacc394",
+        "version" : "0.6.0"
+      }
+    },
+    {
       "identity" : "swift-crypto",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-crypto.git",
