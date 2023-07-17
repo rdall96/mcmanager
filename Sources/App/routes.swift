@@ -1,6 +1,6 @@
 import Fluent
 import Vapor
-import Shared
+import MCManager_Shared
 
 func routes(_ app: Application) throws {
     try app.register(collection: API())

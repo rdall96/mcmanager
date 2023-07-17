@@ -7,6 +7,6 @@
 
 import Fluent
 import Vapor
-import Shared
+import MCManager_Shared
 
 extension Shared.Server: Content {}

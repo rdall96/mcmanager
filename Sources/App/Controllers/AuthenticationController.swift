@@ -7,7 +7,7 @@
 
 import Fluent
 import Vapor
-import Shared
+import MCManager_Shared
 
 struct AuthenticationController: RouteCollection {
     func boot(routes: RoutesBuilder) throws {

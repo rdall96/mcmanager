@@ -19,12 +19,30 @@
       }
     },
     {
+      "identity" : "bettercodable",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/marksands/BetterCodable.git",
+      "state" : {
+        "revision" : "61153170668db7a46a20a87e35e70f80b24d4eb5",
+        "version" : "0.4.0"
+      }
+    },
+    {
       "identity" : "console-kit",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vapor/console-kit.git",
       "state" : {
         "revision" : "447f1046fb4e9df40973fe426ecb24a6f0e8d3b4",
         "version" : "4.6.0"
+      }
+    },
+    {
+      "identity" : "dockerswift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/m-barthelemy/DockerSwift.git",
+      "state" : {
+        "revision" : "be6949ca4c38b7da2d4828eb3020bb1623eb2c9f",
+        "version" : "1.41.0-beta10"
       }
     },
     {

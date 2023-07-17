@@ -48,3 +48,15 @@ extension DirectoryConfiguration {
         Shell.run("ssh-keygen -t rsa-sha2-256 -b 2048 -f \"\(path)\" -N \"mcmanager\"")
     }
 }
+
+enum Shell {
+    @discardableResult
+    fileprivate static func run(_ args: String...) -> Int32 {
+        let task = Process()
+        task.launchPath = "/bin/bash"
+        task.arguments = args
+        task.launch()
+        task.waitUntilExit()
+        return task.terminationStatus
+    }
+}

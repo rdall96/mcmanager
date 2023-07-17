@@ -7,7 +7,7 @@
 
 import Fluent
 import Vapor
-@_spi(MCManager_Server) import Shared
+@_spi(MCManager_Server) import MCManager_Shared
 
 extension User: Content {}
 

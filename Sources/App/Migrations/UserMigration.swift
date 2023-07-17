@@ -6,7 +6,7 @@
 //
 
 import Fluent
-@_spi(MCManager_Server) import Shared
+@_spi(MCManager_Server) import MCManager_Shared
 
 extension User {
     struct Migration: AsyncMigration {

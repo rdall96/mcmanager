@@ -14,33 +14,49 @@ let package = Package(
         .package(url: "https://github.com/vapor/fluent-sqlite-driver.git", from: "4.0.0"),
         // JWT for authentication
         .package(url: "https://github.com/vapor/jwt.git", from: "4.2.2"),
+        // Docker client
+        .package(url: "https://github.com/m-barthelemy/DockerSwift.git", exact: .init(stringLiteral: "1.41.0-beta10"))
     ],
     targets: [
+        
         // Shared data model
         .target(
-            name: "Shared",
+            name: "MCManager-Shared",
             dependencies: [
                 .product(name: "Fluent", package: "fluent"),
                 .product(name: "FluentSQLiteDriver", package: "fluent-sqlite-driver"),
+            ],
+            path: "Sources/Shared"
+        ),
+        .testTarget(
+            name: "MCManager-SharedTests",
+            dependencies: [
+                .target(name: "MCManager-Shared")
+            ],
+            path: "Tests/SharedTests"
+        ),
+        
+        // Minecraft runtime (mcmanager-core)
+        .target(
+            name: "MinecraftRuntime",
+            dependencies: [
+                .target(name: "MCManager-Shared"),
+                .product(name: "DockerSwift", package: "DockerSwift"),
             ]
         ),
-        .testTarget(name: "SharedTests", dependencies: [
-            .target(name: "Shared")
-        ]),
-        // Tools & utilities
-        .target(
-            name: "Utilities",
-            dependencies: []
+        .testTarget(
+            name: "MinecraftRuntimeTests",
+            dependencies: [
+                .target(name: "MinecraftRuntime")
+            ]
         ),
-        .testTarget(name: "UtilitiesTests", dependencies: [
-            .target(name: "Utilities")
-        ]),
+        
         // Web server
         .executableTarget(
             name: "App",
             dependencies: [
-                .target(name: "Shared"),
-                .target(name: "Utilities"),
+                .target(name: "MCManager-Shared"),
+                .target(name: "MinecraftRuntime"),
                 .product(name: "Fluent", package: "fluent"),
                 .product(name: "FluentSQLiteDriver", package: "fluent-sqlite-driver"),
                 .product(name: "Vapor", package: "vapor"),
@@ -53,9 +69,12 @@ let package = Package(
                 .unsafeFlags(["-cross-module-optimization"], .when(configuration: .release))
             ]
         ),
-        .testTarget(name: "AppTests", dependencies: [
-            .target(name: "App"),
-            .product(name: "XCTVapor", package: "vapor"),
-        ])
+        .testTarget(
+            name: "AppTests",
+            dependencies: [
+                .target(name: "App"),
+                .product(name: "XCTVapor", package: "vapor"),
+            ]
+        )
     ]
 )

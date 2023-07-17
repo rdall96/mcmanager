@@ -3,8 +3,7 @@ import Fluent
 import FluentSQLiteDriver
 import JWT
 import Vapor
-
-import Shared
+import MCManager_Shared
 
 extension JWKIdentifier {
     static let `public` = JWKIdentifier(string: "public")

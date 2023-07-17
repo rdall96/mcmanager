@@ -8,8 +8,7 @@
 import Fluent
 import JWT
 import Vapor
-
-import Shared
+import MCManager_Shared
 
 final class SessionToken: Model, Content {
     static let schema = "tokens"
