@@ -9,4 +9,4 @@ import Fluent
 import Vapor
 import MCManager_Shared
 
-extension Shared.Server: Content {}
+extension MCManager_Shared.Server: Content {}

@@ -16,9 +16,9 @@ extension User {
                 .field(User.FieldKeys.username.rawValue, .string, .required)
                 .unique(on: User.FieldKeys.username.rawValue)
                 .field(User.FieldKeys.password.rawValue, .string, .required)
-                .field(User.FieldKeys.created_at.rawValue, .datetime, .required)
-                .field(User.FieldKeys.updated_at.rawValue, .datetime, .required)
-                .field(User.FieldKeys.is_admin.rawValue, .bool, .required)
+                .field(User.FieldKeys.createdAt.rawValue, .datetime, .required)
+                .field(User.FieldKeys.updatedAt.rawValue, .datetime, .required)
+                .field(User.FieldKeys.isAdmin.rawValue, .bool, .required)
                 .create()
         }
         

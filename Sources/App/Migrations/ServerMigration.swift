@@ -17,8 +17,8 @@ extension Server {
                 .field(Server.FieldKeys.type.rawValue, .string, .required)
                 .field(Server.FieldKeys.version.rawValue, .string, .required)
                 .field(Server.FieldKeys.port.rawValue, .uint32, .required)
-                .field(Server.FieldKeys.created_at.rawValue, .datetime, .required)
-                .field(Server.FieldKeys.updated_at.rawValue, .datetime, .required)
+                .field(Server.FieldKeys.createdAt.rawValue, .datetime, .required)
+                .field(Server.FieldKeys.updatedAt.rawValue, .datetime, .required)
                 .create()
         }
         

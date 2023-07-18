@@ -18,7 +18,13 @@ fileprivate struct API: RouteCollection {
             Version.current.description
         }
         
+        // settings
+        try api.register(collection: SettingsController())
+        
+        // users
         try api.register(collection: UserController())
+        
+        // servers
         try api.register(collection: ServerController())
     }
 }

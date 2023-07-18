@@ -67,6 +67,7 @@ fileprivate func connectDatabase(_ app: Application) throws {
 
 fileprivate func migrateDatabase(_ app: Application) async throws {
     // Add database migrations
+    app.migrations.add(Settings.Migration())
     app.migrations.add(User.Migration())
     app.migrations.add(SessionToken.Migration())
     app.migrations.add(Server.Migration())
