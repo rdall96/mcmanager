@@ -57,18 +57,7 @@ final actor ServerRuntime: Identifiable {
         }
     }
     
-    deinit {
-        // stop the server if it's running
-        Task(priority: .high) {
-            guard await isRunning else { return }
-            do {
-                try await stop()
-            }
-            catch {
-                // TODO: Log an error if we fail to shutdown the server
-            }
-        }
-    }
+    deinit {}
     
     // MARK: - Computed Members
     

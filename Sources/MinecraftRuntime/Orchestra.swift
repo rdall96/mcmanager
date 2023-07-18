@@ -15,7 +15,7 @@ import DockerSwift
 public final class ServerOrchestra {
     
     private let serversRoot: URL
-    private var servers: [UUID : ServerRuntime]
+    private var serverRuntimes: [UUID : ServerRuntime]
     private var statusUpdaterTask: Task<Void, Never>?
     
     private let docker: DockerClient
@@ -25,7 +25,7 @@ public final class ServerOrchestra {
         self.serversRoot = serversRoot
         try FileManager.default.createDirectory(at: serversRoot, withIntermediateDirectories: true)
         
-        servers = [:]
+        serverRuntimes = [:]
         statusUpdaterTask = nil
         
         // create a docker client to use for server execution
@@ -70,7 +70,7 @@ public final class ServerOrchestra {
         )
         let unusedServersOnDisk: [URL] = allServersOnDisk.filter {
             guard let uuid = UUID(uuidString: $0.lastPathComponent) else { return false }
-            return servers[uuid] == nil
+            return serverRuntimes[uuid] == nil
         }
         for unusedServerPath in unusedServersOnDisk {
             try FileManager.default.removeItem(at: unusedServerPath)
@@ -86,17 +86,17 @@ public final class ServerOrchestra {
     }
     
     private func enableStatusUpdates() {
-        if servers.isEmpty, statusUpdaterTask != nil {
+        if serverRuntimes.isEmpty, statusUpdaterTask != nil {
             statusUpdaterTask?.cancel()
         }
-        statusUpdaterTask = servers.isEmpty ? nil : Self.createStatusUpdateJob()
+        statusUpdaterTask = serverRuntimes.isEmpty ? nil : Self.createStatusUpdateJob()
     }
     
     // MARK: - Server management
     
     private func requireId(for server: Server) throws -> UUID {
         guard let uuid = server.id,
-              servers[uuid] != nil
+              serverRuntimes[uuid] != nil
         else {
             throw MCRError.invalidServerId
         }
@@ -104,7 +104,7 @@ public final class ServerOrchestra {
     }
     
     private func requireServer(withId uuid: UUID) throws -> ServerRuntime {
-        guard let serverRuntime = servers[uuid] else {
+        guard let serverRuntime = serverRuntimes[uuid] else {
             throw MCRError.invalidServerId
         }
         return serverRuntime
@@ -113,23 +113,25 @@ public final class ServerOrchestra {
     /// Add a server to the orchestra, if it doesn't exist, this methods creates the new server
     public func add(server: Server) async throws {
         // ensure this server doesn't already exist
-        let serverId = try requireId(for: server)
-        guard servers[serverId] == nil else { throw MCRError.duplicateServer(serverId) }
+        guard let serverId = server.id else {
+            throw MCRError.invalidServerId
+        }
+        guard serverRuntimes[serverId] == nil else { throw MCRError.duplicateServer(serverId) }
         let runtime = try await ServerRuntime(info: server, rootPath: serversRoot, docker: docker)
-        servers[serverId] = runtime
+        serverRuntimes[serverId] = runtime
     }
     
     /// Update the info for the given server
     public func update(server: Server) async throws {
         let serverId = try requireId(for: server)
-        try await servers[serverId]?.update(server)
+        try await serverRuntimes[serverId]?.update(server)
     }
     
-    /// Delete a server
-    public func delete(server: Server) async throws {
-        let serverId = try requireId(for: server)
-        try await servers[serverId]?.delete()
-        servers.removeValue(forKey: serverId)
+    /// Delete a server by ID
+    public func delete(serverWithId uuid: UUID) async throws {
+        _ = try requireServer(withId: uuid)
+        try await serverRuntimes[uuid]?.delete()
+        serverRuntimes.removeValue(forKey: uuid)
     }
     
     // MARK: - Creation

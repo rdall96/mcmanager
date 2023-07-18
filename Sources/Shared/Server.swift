@@ -193,6 +193,12 @@ extension Server {
         public let id: String
         public var value: Value
         
+        @_spi(MCManager_Tests)
+        public init(id: String, value: Value) {
+            self.id = id
+            self.value = value
+        }
+        
         public static func == (lhs: Server.Config, rhs: Server.Config) -> Bool {
             // we only check the id since two objects with the same name cannot exist in the same list,
             // and therefore they should override each other
