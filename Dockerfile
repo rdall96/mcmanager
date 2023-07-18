@@ -5,9 +5,9 @@ FROM swift:5.8-jammy as build
 
 # Install OS updates and, if needed, sqlite3
 RUN export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true \
-    && apt-get -q update \
-    && apt-get -q dist-upgrade -y\
-    && rm -rf /var/lib/apt/lists/*
+  && apt update \
+  && apt dist-upgrade -y\
+  && rm -rf /var/lib/apt/lists/*
 
 # Set up a build area
 WORKDIR /build
@@ -44,27 +44,31 @@ RUN [ -d /build/Resources ] && { mv /build/Resources ./Resources && chmod -R a-w
 # ================================
 FROM ubuntu:jammy
 
+ENV MCMANAGER_HOME="/app"
+
 # Make sure all system packages are up to date, and install only essential packages.
 RUN export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true \
-    && apt-get -q update \
-    && apt-get -q dist-upgrade -y \
-    && apt-get -q install -y \
-      ca-certificates \
-      tzdata \
+  && apt update \
+  && apt dist-upgrade -y \
+  && apt install -y \
+    ca-certificates \
+    tzdata \
+    curl \
+    docker.io \
 # If your app or its dependencies import FoundationNetworking, also install `libcurl4`.
-      # libcurl4 \
+    # libcurl4 \
 # If your app or its dependencies import FoundationXML, also install `libxml2`.
-      # libxml2 \
-    && rm -r /var/lib/apt/lists/*
+    # libxml2 \
+  && rm -r /var/lib/apt/lists/*
 
-# Create an mcmanager user and group with /app as its home directory
-RUN useradd --user-group --create-home --system --skel /dev/null --home-dir /app mcmanager
+# Create an mcmanager user and group with $MCMANAGER_HOME as its home directory
+RUN useradd --user-group --create-home --system --skel /dev/null --home-dir ${MCMANAGER_HOME} mcmanager
 
 # Switch to the new home directory
-WORKDIR /app
+WORKDIR ${MCMANAGER_HOME}
 
 # Copy built executable and any staged resources from builder
-COPY --from=build --chown=mcmanager:mcmanager /staging /app
+COPY --from=build --chown=mcmanager:mcmanager /staging ${MCMANAGER_HOME}
 
 # Ensure all further commands run as the mcmanager user
 USER mcmanager:mcmanager
@@ -74,4 +78,5 @@ EXPOSE 8000
 
 # Start the service when the image is run, default to listening on 8000 in production environment
 ENTRYPOINT ["./App"]
+VOLUME [ ${MCMANAGER_HOME} ]
 CMD ["serve", "--env", "production", "--hostname", "0.0.0.0", "--port", "8000"]

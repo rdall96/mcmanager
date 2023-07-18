@@ -5,7 +5,6 @@
 //  Created by Ricky Dall'Armellina on 7/14/23.
 //
 
-import Foundation
 import Vapor
 import Commands
 
@@ -18,13 +17,7 @@ extension DirectoryConfiguration {
     /// Data diredtory to store all persistent pp data
     var dataDirectory: URL {
         get throws {
-            let directory: URL!
-            if let dataDirectory = ProcessInfo.processInfo.environment["MCMANAGER_HOME"] {
-                directory = URL(fileURLWithPath: dataDirectory)
-            }
-            else {
-                directory = workingDirectoryURL.appendingPathComponent("data", isDirectory: true)
-            }
+            let directory = workingDirectoryURL.appendingPathComponent("data", isDirectory: true)
             try FileManager.default.createDirectory(atPath: directory.path, withIntermediateDirectories: true)
             return directory
         }
