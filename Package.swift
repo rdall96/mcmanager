@@ -4,7 +4,7 @@ import PackageDescription
 let package = Package(
     name: "MCManager",
     platforms: [
-        .macOS(.v13)
+        .macOS(.v12)
     ],
     dependencies: [
         // Web framework: Vapor
@@ -64,6 +64,7 @@ let package = Package(
                 .product(name: "FluentSQLiteDriver", package: "fluent-sqlite-driver"),
                 .product(name: "Vapor", package: "vapor"),
                 .product(name: "JWT", package: "jwt"),
+                .product(name: "Commands", package: "swift-commands"),
             ],
             swiftSettings: [
                 // Enable better optimizations when building in Release configuration. Despite the use of

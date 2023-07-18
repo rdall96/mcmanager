@@ -6,11 +6,11 @@
 //
 
 public struct Version {
-    public let major: UInt32
-    public let minor: UInt32
-    public let patch: UInt32
+    public let major: UInt
+    public let minor: UInt
+    public let patch: UInt
     
-    private init(major: UInt32, minor: UInt32, patch: UInt32) {
+    private init(major: UInt, minor: UInt, patch: UInt) {
         self.major = major
         self.minor = minor
         self.patch = patch
@@ -18,8 +18,8 @@ public struct Version {
     
     /// Create a version object from the textual description
     public init?(from description: String) {
-        let components: [UInt32] = description.split(separator: ".")
-            .compactMap { try? UInt32(String($0), format: .number) }
+        let components: [UInt] = description.split(separator: ".")
+            .compactMap { UInt(String($0)) }
         guard components.count == 3 else { return nil }
         major = components[0]
         minor = components[1]

@@ -34,7 +34,7 @@ final actor ServerRuntime: Identifiable {
         try FileManager.default.createDirectory(at: path, withIntermediateDirectories: true)
         
         type = info.type
-        version = info.version
+        version = info.version.description
         port = info.port
         
         // Read configuration
@@ -84,7 +84,7 @@ final actor ServerRuntime: Identifiable {
         guard let id = info.id, self.id == id else {
             throw MCRError.invalidServerId
         }
-        version = info.version
+        version = info.version.description
         port = info.port
     }
     
@@ -128,18 +128,20 @@ final actor ServerRuntime: Identifiable {
     }
     
     /// Read the serve ricon (if it exists) and return the base64 encoded data
-    var icon: String? {
+    var icon: Server.Icon {
         guard FileManager.default.fileExists(atPath: iconPath.path),
               let contents = try? Data(contentsOf: iconPath)
         else {
-            return nil
+            return .none
         }
-        return contents.base64EncodedString()
+        return .init(contents.base64EncodedString())
     }
     
     /// Update the server icon with the given base64 encoded icon data
-    func updateIcon(_ base64: String) throws {
-        guard let data = Data(base64Encoded: base64) else {
+    func updateIcon(_ icon: Server.Icon) throws {
+        guard let base64 = icon.base64,
+              let data = Data(base64Encoded: base64)
+        else {
             throw MCRError.invalidIconData
         }
         do {

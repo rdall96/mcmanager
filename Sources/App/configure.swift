@@ -27,18 +27,18 @@ public func configure(_ app: Application) async throws {
 //    try setupKeys(app)
     
     // Register routes
-    try routes(app)
+    try await routes(app)
 }
 
 fileprivate func setupKeys(_ app: Application) throws {
     let privateKeyPath = try app.directory.privateKeyPath
-    if !FileManager.default.fileExists(atPath: privateKeyPath) {
+    if !FileManager.default.fileExists(atPath: privateKeyPath.path) {
         app.directory.generateKeys(at: privateKeyPath)
     }
-    let privateKey = try String(contentsOfFile: privateKeyPath)
+    let privateKey = try String(contentsOfFile: privateKeyPath.path)
     let privateSigner = try JWTSigner.rs256(key: .private(pem: privateKey.bytes))
     
-    let publicKey = try String(contentsOfFile: try app.directory.publicKeyPath)
+    let publicKey = try String(contentsOfFile: try app.directory.publicKeyPath.path)
     let publicSigner = try JWTSigner.rs256(key: .public(pem: publicKey.bytes))
     
     app.jwt.signers.use(privateSigner, kid: .private)
@@ -53,7 +53,7 @@ fileprivate func connectDatabase(_ app: Application) throws {
     do {
         let databasePath = try DirectoryConfiguration.detect().defaultDatabasePath
         app.databases.use(
-            .sqlite(.file(databasePath)),
+            .sqlite(.file(databasePath.path)),
             as: .sqlite,
             isDefault: true
         )
@@ -78,10 +78,14 @@ fileprivate func migrateDatabase(_ app: Application) async throws {
 
 /// Perform the first time setup for the app. i.e.: create the default admin user
 fileprivate func firstTimeSetup(_ app: Application) async throws {
-    let admin = User.admin
-    
     // If there's no admin user, create one
-    guard try await User.find(admin.id, on: app.db) == nil
-    else { return }
-    try await admin.save(on: app.db)
+    let admin = User.admin
+    if try await User.find(admin.id, on: app.db) == nil {
+        try await admin.save(on: app.db)
+    }
+    
+    // Write default settings
+    if try await Settings.query(on: app.db).all().isEmpty {
+        try await Settings.defaults.save(on: app.db)
+    }
 }

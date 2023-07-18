@@ -10,3 +10,11 @@ import Vapor
 import MCManager_Shared
 
 extension Settings: Content {}
+
+extension Settings {
+    static var defaults: Settings {
+        .init(
+            serverStatusTTLSeconds: 5
+        )
+    }
+}

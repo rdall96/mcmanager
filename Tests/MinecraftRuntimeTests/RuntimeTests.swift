@@ -88,7 +88,7 @@ final class RuntimeTests: XCTestCase {
         let server = TestData.createServer()
         let runtime = try await ServerRuntime(info: server, rootPath: testPath, docker: docker)
         var icon = await runtime.icon
-        XCTAssertNil(icon)
+        XCTAssertNil(icon.base64)
         try await runtime.updateIcon(TestData.serverIcon)
         icon = await runtime.icon
         XCTAssertNotNil(icon)
@@ -102,7 +102,7 @@ final class RuntimeTests: XCTestCase {
         let server = TestData.createServer()
         let runtime = try await ServerRuntime(info: server, rootPath: testPath, docker: docker)
         do {
-            try await runtime.updateIcon("definitely_not_base64")
+            try await runtime.updateIcon(.init("definitely_not_base64"))
             XCTFail("Expected failure when updating icon with invalid data")
         }
         catch MCRError.invalidIconData {}
@@ -115,7 +115,7 @@ final class RuntimeTests: XCTestCase {
         let server = TestData.createServer()
         let runtime = try await ServerRuntime(info: server, rootPath: testPath, docker: docker)
         var icon = await runtime.icon
-        XCTAssertNil(icon)
+        XCTAssertNil(icon.base64)
         try await runtime.updateIcon(TestData.serverIcon)
         icon = await runtime.icon
         XCTAssertNotNil(icon)
@@ -126,7 +126,7 @@ final class RuntimeTests: XCTestCase {
         await runtime.removeIcon()
         XCTAssertFalse(FileManager.default.fileExists(atPath: iconpath.path))
         icon = await runtime.icon
-        XCTAssertNil(icon)
+        XCTAssertNil(icon.base64)
     }
     
     func testUpdateConfigHappyPath() async throws {

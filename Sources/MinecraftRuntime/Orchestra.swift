@@ -18,9 +18,10 @@ public final class ServerOrchestra {
     private var serverRuntimes: [UUID : ServerRuntime]
     private var statusUpdaterTask: Task<Void, Never>?
     
+    private var settings: Settings
     private let docker: DockerClient
     
-    public init(serversRoot: URL) async throws {
+    public init(serversRoot: URL, settings: Settings) throws {
         // create the servers root directory if it doesn't exist
         self.serversRoot = serversRoot
         try FileManager.default.createDirectory(at: serversRoot, withIntermediateDirectories: true)
@@ -28,15 +29,10 @@ public final class ServerOrchestra {
         serverRuntimes = [:]
         statusUpdaterTask = nil
         
+        self.settings = settings
+        
         // create a docker client to use for server execution
         docker = DockerClient()
-        // ensure this host has access to docker
-        do {
-            try await docker.ping()
-        }
-        catch {
-            throw MCRError.dockerError(error)
-        }
     }
     
     deinit {
@@ -50,6 +46,11 @@ public final class ServerOrchestra {
         catch {
             // TODO: Log an error if we fail to shutdown docker
         }
+    }
+    
+    public func update(settings: Settings) {
+        self.settings = settings
+        // TODO: Restart tasks that depend on the settings
     }
     
     /// Clean up unused files on the system
@@ -134,24 +135,15 @@ public final class ServerOrchestra {
         serverRuntimes.removeValue(forKey: uuid)
     }
     
-    // MARK: - Creation
+    // MARK: - Runtime support
     
     /// Get information regarding all supported runtimes that can be used to create new servers
     public var allSupportedRuntimes: [Server.RuntimeSupport] {
         get async throws {
-            var result: [Server.RuntimeSupport] = []
-            let allTags  = docker.images.query(image: ServerRuntime.dockerImageName)
-            for serverType in Server.ServerType.allCases {
-                let tags: [String] = allTags.lazy
-                    .filter { $0.contains(serverType.dockerTagName) }
-                    .sorted()
-                    .reversed()
-                result.append(.init(
-                    type: serverType,
-                    versions: tags
-                ))
+            let allTags = docker.images.query(image: ServerRuntime.dockerImageName)
+            return Server.ServerType.allCases.compactMap {
+                .init(type: $0, versions: Server.RuntimeSupport.tags(for: $0, from: allTags))
             }
-            return result
         }
     }
     
@@ -166,31 +158,31 @@ public final class ServerOrchestra {
     // MARK: - Properties & config
     
     /// Get the server config (aka server properties)
-    func config(for serverId: UUID) async throws -> Set<Server.Config> {
+    public func config(for serverId: UUID) async throws -> Set<Server.Config> {
         let server = try requireServer(withId: serverId)
         return await server.config
     }
     
     /// Update the config for a server
-    func updateConfig(_ config: Set<Server.Config>, for serverId: UUID) async throws {
+    public func updateConfig(_ config: Set<Server.Config>, for serverId: UUID) async throws {
         let server = try requireServer(withId: serverId)
         try await server.updateConfig(config)
     }
     
     /// Get the icon for a server
-    func icon(for serverId: UUID) async throws -> String? {
+    public func icon(for serverId: UUID) async throws -> Server.Icon {
         let server = try requireServer(withId: serverId)
         return await server.icon
     }
     
     /// Update the server icon
-    func updateIcon(_ iconData: String, for serverId: UUID) async throws {
+    public func updateIcon(_ icon: Server.Icon, for serverId: UUID) async throws {
         let server = try requireServer(withId: serverId)
-        try await server.updateIcon(iconData)
+        try await server.updateIcon(icon)
     }
     
     /// Remove the server icon
-    func removeIcon(for serverId: UUID) async throws {
+    public func removeIcon(for serverId: UUID) async throws {
         let server = try requireServer(withId: serverId)
         await server.removeIcon()
     }
@@ -198,29 +190,29 @@ public final class ServerOrchestra {
     // MARK: - Execution
     
     /// Start a server
-    func start(serverWithId serverId: UUID) async throws {
+    public func start(serverWithId serverId: UUID) async throws {
         let server = try requireServer(withId: serverId)
         try await server.start()
     }
     
     /// Stop a server
-    func stop(serverWithId serverId: UUID) async throws {
+    public func stop(serverWithId serverId: UUID) async throws {
         let server = try requireServer(withId: serverId)
         try await server.stop()
     }
     
     /// Restart a server
-    func restart(serverWithId serverId: UUID) async throws {
+    public func restart(serverWithId serverId: UUID) async throws {
         let server = try requireServer(withId: serverId)
         try await server.restart()
     }
     
-    func send(command: String, to serverId: UUID) async throws {
+    public func send(command: String, to serverId: UUID) async throws {
         let server = try requireServer(withId: serverId)
         try await server.send(command: command)
     }
     
-    func logs(for serverId: UUID, tail: UInt? = nil) async throws -> String {
+    public func logs(for serverId: UUID, tail: UInt? = nil) async throws -> String {
         let server = try requireServer(withId: serverId)
         return try await server.logs(tail: tail)
     }

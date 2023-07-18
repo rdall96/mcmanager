@@ -22,10 +22,7 @@ final public class Settings: Model {
     @Field(key: FieldKeys.serverStatusTTLSeconds.rawValue)
     public var serverStatusTTLSeconds: UInt
     
-    public init() {
-        // there's only one service wide settings object, so we make the ID nil
-        id = nil
-    }
+    public init() {}
     
     public convenience init(
         serverStatusTTLSeconds: UInt
@@ -50,13 +47,5 @@ extension Settings: Codable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(serverStatusTTLSeconds, forKey: .serverStatusTTLSeconds)
-    }
-}
-
-extension Settings {
-    public static var defaults: Settings {
-        .init(
-            serverStatusTTLSeconds: 5
-        )
     }
 }

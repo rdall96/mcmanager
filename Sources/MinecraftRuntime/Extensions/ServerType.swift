@@ -19,6 +19,8 @@ extension Server.ServerType {
             return "forge"
         case .bedrock:
             return "bedrock"
+        default:
+            return ""
         }
     }
 }
