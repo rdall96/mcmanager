@@ -162,7 +162,7 @@ final actor ServerRuntime: Identifiable {
     }
     
     /// Remove the server icon
-    func deleteIcon() {
+    func removeIcon() {
         try? FileManager.default.removeItem(at: iconPath)
     }
     
