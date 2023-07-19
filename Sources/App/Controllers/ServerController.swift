@@ -35,7 +35,7 @@ struct ServerController: RouteCollection {
             server.delete(use: delete)
             
             // status
-            server.get("info", use: info)
+            server.get("status", use: status)
             
             // properties & config
             server.get("configuration", use: config)
@@ -128,7 +128,7 @@ struct ServerController: RouteCollection {
     
     // MARK: - Status
     
-    func info(req: Request) async throws -> MCServer.Info {
+    func status(req: Request) async throws -> MCServer.Info {
         guard let serverId: UUID = req.parameters.get("serverID") else {
             throw Abort(.notFound)
         }
