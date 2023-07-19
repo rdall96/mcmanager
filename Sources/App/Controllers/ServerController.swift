@@ -38,8 +38,8 @@ struct ServerController: RouteCollection {
             server.get("info", use: info)
             
             // properties & config
-            server.get("config", use: config)
-            server.put("config", use: updateConfig)
+            server.get("configuration", use: config)
+            server.put("configuration", use: updateConfig)
             server.get("icon", use: icon)
             server.put("icon", use: updateIcon)
             server.delete("icon", use: removeIcon)
