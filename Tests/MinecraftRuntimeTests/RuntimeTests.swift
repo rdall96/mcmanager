@@ -7,26 +7,20 @@
 
 @testable import MinecraftRuntime
 @_spi(MCManager_Tests) import MCManager_Shared
-import DockerSwift
+import DockerSwiftAPI
 import XCTest
 
 final class RuntimeTests: XCTestCase {
     
     var testPath: URL!
-    var docker: DockerClient!
     
-    override func setUp() async throws {
+    override func setUp() {
         // assign a temporary directory
         testPath = FileManager.default.temporaryDirectory
-        
-        // ensure docker is running
-        docker = DockerClient()
-        try await docker?.ping()
     }
     
-    override func tearDown() async throws {
-        // terminate Docker client
-        try await docker.shutdown()
+    private func createRuntime(with server: Server) async throws -> ServerRuntime {
+        try await ServerRuntime(info: server, rootPath: testPath)
     }
     
     // MARK: - Test cases
@@ -36,7 +30,7 @@ final class RuntimeTests: XCTestCase {
         let serverPath = testPath
             .appendingPathComponent(server.id!.pathSafeString)
         XCTAssertFalse(FileManager.default.fileExists(atPath: serverPath.path))
-        _ = try await ServerRuntime(info: server, rootPath: testPath, docker: docker)
+        _ = try await createRuntime(with: server)
         XCTAssertTrue(FileManager.default.fileExists(atPath: serverPath.path))
     }
     
@@ -46,7 +40,7 @@ final class RuntimeTests: XCTestCase {
             .appendingPathComponent(server.id!.pathSafeString)
             .appendingPathComponent(ServerRuntime.configFileName)
         XCTAssertFalse(FileManager.default.fileExists(atPath: configPath.path))
-        _ = try await ServerRuntime(info: server, rootPath: testPath, docker: docker)
+        _ = try await createRuntime(with: server)
         XCTAssertTrue(FileManager.default.fileExists(atPath: configPath.path))
         let data = try Data(contentsOf: configPath)
         let config: [Server.Config] = try JSONDecoder().decode([Server.Config].self, from: data)
@@ -56,7 +50,7 @@ final class RuntimeTests: XCTestCase {
     
     func testUpdateRuntimeHappyPath() async throws {
         let server = TestData.createServer()
-        let runtime = try await ServerRuntime(info: server, rootPath: testPath, docker: docker)
+        let runtime = try await createRuntime(with: server)
         server.port = ServerRuntime.minecraftServerPort
         server.version = TestData.versions.randomElement()!
         try await runtime.update(server)
@@ -64,7 +58,7 @@ final class RuntimeTests: XCTestCase {
     
     func testUpdateRuntimeInvalid() async throws {
         let server = TestData.createServer()
-        let runtime = try await ServerRuntime(info: server, rootPath: testPath, docker: docker)
+        let runtime = try await createRuntime(with: server)
         server.id = UUID()
         server.version = TestData.versions.randomElement()!
         do {
@@ -76,7 +70,7 @@ final class RuntimeTests: XCTestCase {
     
     func testDeleteRuntimeHappyPath() async throws {
         let server = TestData.createServer()
-        let runtime = try await ServerRuntime(info: server, rootPath: testPath, docker: docker)
+        let runtime = try await createRuntime(with: server)
         let runtimePath = testPath
             .appendingPathComponent(server.id!.pathSafeString)
         XCTAssertTrue(FileManager.default.fileExists(atPath: runtimePath.path))
@@ -86,7 +80,7 @@ final class RuntimeTests: XCTestCase {
     
     func testUpdateIconHappyPath() async throws {
         let server = TestData.createServer()
-        let runtime = try await ServerRuntime(info: server, rootPath: testPath, docker: docker)
+        let runtime = try await createRuntime(with: server)
         var icon = await runtime.icon
         XCTAssertNil(icon.base64)
         try await runtime.updateIcon(TestData.serverIcon)
@@ -100,7 +94,7 @@ final class RuntimeTests: XCTestCase {
     
     func testUpdateIconWithInvalidData() async throws {
         let server = TestData.createServer()
-        let runtime = try await ServerRuntime(info: server, rootPath: testPath, docker: docker)
+        let runtime = try await createRuntime(with: server)
         do {
             try await runtime.updateIcon(.init("definitely_not_base64"))
             XCTFail("Expected failure when updating icon with invalid data")
@@ -113,7 +107,7 @@ final class RuntimeTests: XCTestCase {
     
     func testDeleteIcon() async throws {
         let server = TestData.createServer()
-        let runtime = try await ServerRuntime(info: server, rootPath: testPath, docker: docker)
+        let runtime = try await createRuntime(with: server)
         var icon = await runtime.icon
         XCTAssertNil(icon.base64)
         try await runtime.updateIcon(TestData.serverIcon)
@@ -130,7 +124,7 @@ final class RuntimeTests: XCTestCase {
     }
     
     func testUpdateConfigHappyPath() async throws {
-        let runtime = try await ServerRuntime(info: TestData.createServer(), rootPath: testPath, docker: docker)
+        let runtime = try await createRuntime(with: TestData.createServer())
         var config = await runtime.config
         XCTAssert(
             config.first(where: { $0.id == "PVP" })?.value.description == "true"
@@ -145,7 +139,7 @@ final class RuntimeTests: XCTestCase {
     }
     
     func testUpdateConfigWithUnknownKey() async throws {
-        let runtime = try await ServerRuntime(info: TestData.createServer(), rootPath: testPath, docker: docker)
+        let runtime = try await createRuntime(with: TestData.createServer())
         do {
             try await runtime.updateConfig(
                 [.init(id: "INVICIBLE", value: .flag(true))]
@@ -187,15 +181,20 @@ final class RuntimeTests: XCTestCase {
     }
     
     func testRuntimeInfo() async throws {
-        let runtime = try await ServerRuntime(info: TestData.createServer(), rootPath: testPath, docker: docker)
-        let info = await runtime.info
+        let runtime = try await createRuntime(with: TestData.createServer())
+        let info = try await runtime.info
         XCTAssertEqual(info.status, .stopped)
         XCTAssertEqual(info.onlinePlayerCount, 0)
-        XCTAssertEqual(info.cpuUsage, 0)
+        XCTAssertEqual(info.cpuPercent, 0)
         XCTAssertEqual(info.memoryUsageBytes, 0)
     }
     
     func testRuntimeInfoStopped() async throws {
         _ = XCTSkip("Not implemented")
     }
+}
+
+// MARK: - Test extensions
+extension ServerRuntime {
+    var getProcess: Docker.Container { process }
 }

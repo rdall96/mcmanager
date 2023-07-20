@@ -19,15 +19,6 @@
       }
     },
     {
-      "identity" : "bettercodable",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/marksands/BetterCodable.git",
-      "state" : {
-        "revision" : "61153170668db7a46a20a87e35e70f80b24d4eb5",
-        "version" : "0.4.0"
-      }
-    },
-    {
       "identity" : "console-kit",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vapor/console-kit.git",
@@ -37,12 +28,12 @@
       }
     },
     {
-      "identity" : "dockerswift",
+      "identity" : "docker-swift-api",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/m-barthelemy/DockerSwift.git",
+      "location" : "https://gitlab.com/rdall96/docker-swift-api",
       "state" : {
-        "revision" : "be6949ca4c38b7da2d4828eb3020bb1623eb2c9f",
-        "version" : "1.41.0-beta10"
+        "branch" : "dev",
+        "revision" : "3baefe5145b43b21efe49f95312332616c2da9f8"
       }
     },
     {
@@ -86,8 +77,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vapor/jwt-kit.git",
       "state" : {
-        "revision" : "dd3fe317f826d43bcefbe20d86f0f787927d05d8",
-        "version" : "4.12.0"
+        "revision" : "9e929d925434b91857661bcd455d1bd53f00bf22",
+        "version" : "4.13.0"
       }
     },
     {
@@ -266,8 +257,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vapor/vapor.git",
       "state" : {
-        "revision" : "1baf62327cc55f55a0767c3a9414dec8ebfdff96",
-        "version" : "4.77.1"
+        "revision" : "e98077ddd1e3535bea6c9514f99d57463816c3bd",
+        "version" : "4.77.2"
       }
     },
     {

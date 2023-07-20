@@ -13,9 +13,9 @@ extension Server {
         /// Number of active players on the server
         public let onlinePlayerCount: UInt?
         /// CPU usage for the server process
-        public let cpuUsage: UInt64
+        public let cpuPercent: Double
         /// Memory usage (bytes) for the server process
-        public let memoryUsageBytes: UInt64
+        public let memoryUsageBytes: UInt
     }
 }
 
@@ -24,7 +24,7 @@ extension Server.Info: Codable {
     private enum CodingKeys: String, CodingKey {
         case status
         case onlinePlayerCount = "online_players"
-        case cpuUsage = "cpu_usage"
+        case cpuPercent = "cpu_percent"
         case memoryUsageBytes = "memory_usage"
     }
     
@@ -33,8 +33,8 @@ extension Server.Info: Codable {
         
         status = try container.decodeIfPresent(Server.Status.self, forKey: .status) ?? .unknown
         onlinePlayerCount = try? container.decode(UInt.self, forKey: .onlinePlayerCount)
-        cpuUsage = try container.decode(UInt64.self, forKey: .cpuUsage)
-        memoryUsageBytes = try container.decode(UInt64.self, forKey: .memoryUsageBytes)
+        cpuPercent = try container.decode(Double.self, forKey: .cpuPercent)
+        memoryUsageBytes = try container.decode(UInt.self, forKey: .memoryUsageBytes)
     }
 }
 
@@ -43,12 +43,12 @@ extension Server.Info {
     public init(
         status: Server.Status,
         onlinePlayerCount: UInt = 0,
-        cpuUsage: UInt64 = 0,
-        memoryUsage: UInt64 = 0
+        cpuPercent: Double = 0,
+        memoryUsage: UInt = 0
     ) {
         self.status = status
         self.onlinePlayerCount = onlinePlayerCount
-        self.cpuUsage = cpuUsage
+        self.cpuPercent = cpuPercent
         self.memoryUsageBytes = memoryUsage
     }
 }

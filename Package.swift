@@ -14,8 +14,8 @@ let package = Package(
         .package(url: "https://github.com/vapor/fluent-sqlite-driver.git", from: "4.0.0"),
         // JWT for authentication
         .package(url: "https://github.com/vapor/jwt.git", from: "4.2.2"),
-        // Docker client
-        .package(url: "https://github.com/m-barthelemy/DockerSwift.git", exact: .init(stringLiteral: "1.41.0-beta10")),
+        // Docker api
+        .package(url: "https://gitlab.com/rdall96/docker-swift-api", branch: "dev"),
         // Swift commands
         .package(url: "https://github.com/qiuzhifei/swift-commands", from: "0.6.0"),
     ],
@@ -43,7 +43,7 @@ let package = Package(
             name: "MinecraftRuntime",
             dependencies: [
                 .target(name: "MCManager-Shared"),
-                .product(name: "DockerSwift", package: "DockerSwift"),
+                .product(name: "DockerSwiftAPI", package: "docker-swift-api"),
                 .product(name: "Commands", package: "swift-commands"),
             ]
         ),

@@ -7,7 +7,7 @@
 
 import Foundation
 @_spi(MCManager_Runtime) import MCManager_Shared
-import DockerSwift
+import DockerSwiftAPI
 
 /**
  The orchestra is an object that manages all the server runtimes on the current host
@@ -15,38 +15,20 @@ import DockerSwift
 public final class ServerOrchestra {
     
     private let serversRoot: URL
-    private var serverRuntimes: [UUID : ServerRuntime]
-    private var statusUpdaterTask: Task<Void, Never>?
-    
     private var settings: Settings
-    private let docker: DockerClient
+    
+    private var serverRuntimes: [UUID : ServerRuntime]
     
     public init(serversRoot: URL, settings: Settings) throws {
         // create the servers root directory if it doesn't exist
         self.serversRoot = serversRoot
         try FileManager.default.createDirectory(at: serversRoot, withIntermediateDirectories: true)
         
-        serverRuntimes = [:]
-        statusUpdaterTask = nil
-        
         self.settings = settings
-        
-        // create a docker client to use for server execution
-        docker = DockerClient()
+        serverRuntimes = [:]
     }
     
-    deinit {
-        statusUpdaterTask?.cancel()
-        statusUpdaterTask = nil
-        
-        // close the docker client connection
-        do {
-            try docker.syncShutdown()
-        }
-        catch {
-            // TODO: Log an error if we fail to shutdown docker
-        }
-    }
+    deinit {}
     
     public func update(settings: Settings) {
         self.settings = settings
@@ -57,8 +39,7 @@ public final class ServerOrchestra {
     public func cleanup() async throws {
         // prunes unused docker images
         do {
-            _ = try await docker.images.prune()
-            _ = try await docker.containers.prune()
+            try await Docker.systemPrune()
         }
         catch {
             throw MCRError.dockerError(error)
@@ -76,21 +57,6 @@ public final class ServerOrchestra {
         for unusedServerPath in unusedServersOnDisk {
             try FileManager.default.removeItem(at: unusedServerPath)
         }
-    }
-    
-    // MARK: - Server status updates
-    
-    private static func createStatusUpdateJob() -> Task<Void, Never> {
-        return Task(priority: .background) { @MainActor in
-            print("Hello")
-        }
-    }
-    
-    private func enableStatusUpdates() {
-        if serverRuntimes.isEmpty, statusUpdaterTask != nil {
-            statusUpdaterTask?.cancel()
-        }
-        statusUpdaterTask = serverRuntimes.isEmpty ? nil : Self.createStatusUpdateJob()
     }
     
     // MARK: - Server management
@@ -118,7 +84,7 @@ public final class ServerOrchestra {
             throw MCRError.invalidServerId
         }
         guard serverRuntimes[serverId] == nil else { throw MCRError.duplicateServer(serverId) }
-        let runtime = try await ServerRuntime(info: server, rootPath: serversRoot, docker: docker)
+        let runtime = try await ServerRuntime(info: server, rootPath: serversRoot)
         serverRuntimes[serverId] = runtime
     }
     
@@ -140,7 +106,10 @@ public final class ServerOrchestra {
     /// Get information regarding all supported runtimes that can be used to create new servers
     public var allSupportedRuntimes: [Server.RuntimeSupport] {
         get async throws {
-            let allTags = docker.images.query(image: ServerRuntime.dockerImageName)
+            let allTags = try await DockerHub.tags(
+                for: ServerRuntime.dockerHubRepositoryName,
+                in: ServerRuntime.dockerHubNamespace
+            ).compactMap { $0.name }
             return Server.ServerType.allCases.compactMap {
                 .init(type: $0, versions: Server.RuntimeSupport.tags(for: $0, from: allTags))
             }
@@ -152,7 +121,7 @@ public final class ServerOrchestra {
     /// Get the status for a specific server
     public func info(for serverId: UUID) async throws -> Server.Info {
         let server = try requireServer(withId: serverId)
-        return await server.info
+        return try await server.info
     }
     
     // MARK: - Properties & config
@@ -212,7 +181,7 @@ public final class ServerOrchestra {
         try await server.send(command: command)
     }
     
-    public func logs(for serverId: UUID, tail: UInt? = nil) async throws -> String {
+    public func logs(for serverId: UUID, tail: UInt? = nil) async throws -> [String] {
         let server = try requireServer(withId: serverId)
         return try await server.logs(tail: tail)
     }

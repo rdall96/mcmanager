@@ -8,7 +8,7 @@
 @_spi(MCManager_Server) import MCManager_Shared
 
 extension Server.RuntimeSupport {
-    static func tags(for serverType: Server.ServerType, from all: Set<String>) -> [String] {
+    static func tags(for serverType: Server.ServerType, from all: [String]) -> [String] {
         // tags contain a specific type name (except for "java")
         switch serverType {
         case .java:

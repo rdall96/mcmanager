@@ -7,23 +7,30 @@
 
 import Foundation
 @_spi(MCManager_Runtime) import MCManager_Shared
-import DockerSwift
+import DockerSwiftAPI
 
 final actor ServerRuntime: Identifiable {
     
+    /// ID of the server
     let id: UUID
+    /// Path of the server files on disk
     let path: URL
+    /// Type of Minecraft server
     let type: Server.ServerType
+    /// Version of Minecraft
     private(set) var version: String
+    /// Port this server is hosted on
     private(set) var port: UInt16
-    
+    /// Configuration of the Minecraft server
     var config: Set<Server.Config>
+    /// Status of the Minecraft server
+    private var status: Server.Status = .unknown
+    /// Docker process (container) that the server is wrapped in
+    internal var process: Docker.Container
+    /// This is used to signal when the process needs to be updated on the next start
+    private var processNeedsUpdate: Bool = false
     
-    private let docker: DockerClient
-    private var status: Server.Status
-    private var process: Container?
-    
-    init(info: Server, rootPath: URL, docker: DockerClient) async throws {
+    init(info: Server, rootPath: URL) async throws {
         guard let id = info.id else {
             throw MCRError.invalidServerId
         }
@@ -43,28 +50,27 @@ final actor ServerRuntime: Identifiable {
             createDefault: true
         )
         
-        // Set the status (this will be updated later on the first status fetch)
-        self.docker = docker
-        status = .unknown
-        process = try? await docker.containers.get(processName)
+        // If there is no existing process for thsi server, create one
+        if let process = await Self.process(for: Self.processName(for: id)) {
+            self.process = process
+        }
+        else {
+            // this will automatically pull the image as well
+            self.process = try await Docker.create(
+                .init(name: Self.processName(for: id)),
+                from: Self.dockerImage(version: version)
+            )
+            // Signal to update the container the next time it's run, since we didn't do a good job above
+            processNeedsUpdate = true
+        }
         
-        // download the docker image for this container
-        do {
-            _ = try await docker.images.pull(byName: dockerImageName)
-        }
-        catch {
-            throw MCRError.downloadFailed
-        }
+        // Check the current server status (it could have been running through an MCManager restart)
+        await updateStatus()
     }
     
     deinit {}
     
     // MARK: - Computed Members
-    
-    private var processName: String {
-        let serverId = id.pathSafeString
-        return "mcmanager_server-\(serverId)"
-    }
     
     private var configPath: URL {
         path.appendingPathComponent(Self.configFileName)
@@ -72,10 +78,6 @@ final actor ServerRuntime: Identifiable {
     
     private var iconPath: URL {
         path.appendingPathComponent(Self.iconFileName)
-    }
-    
-    private var dockerImageName: String {
-        "\(Self.dockerImageName):\(version)"
     }
     
     // MARK: - Methods
@@ -86,23 +88,21 @@ final actor ServerRuntime: Identifiable {
         }
         version = info.version.description
         port = info.port
+        // Signal that we need to update the process the next time it starts
+        processNeedsUpdate = true
     }
     
     /// Delete the server
     func delete() async throws {
-        await updateStatus()
+        guard !(await isRunning) else {
+            throw MCRError.deletionError("Can't delete the server while it's running")
+        }
         // remove the container
         do {
-            try await docker.containers.remove(
-                process?.id ?? processName,
-                force: true
-            )
+            try await Docker.remove(container: process, force: true)
         }
         catch {
-            // if the container was never created, than don't throw
-            if process != nil {
-                throw MCRError.deletionError(error.localizedDescription)
-            }
+            throw MCRError.deletionError(error.localizedDescription)
         }
         // delete the files from disk
         do {
@@ -125,6 +125,8 @@ final actor ServerRuntime: Identifiable {
         // write the new config to disk
         let data = try JSONEncoder().encode(config)
         try data.write(to: configPath)
+        // Signal that we need to update the process the next time it starts
+        processNeedsUpdate = true
     }
     
     /// Read the serve ricon (if it exists) and return the base64 encoded data
@@ -161,61 +163,86 @@ final actor ServerRuntime: Identifiable {
     
     /// Refresh the process status
     private func updateStatus() async {
-        process = try? await docker.containers.get(process?.id ?? processName)
+        let dockerStatus = (try? await Docker.status(of: process)) ?? .unknown
+        status = Server.Status(with: dockerStatus)
     }
     
     /// Check if the process is running
     private var isRunning: Bool {
         get async {
             await updateStatus()
-            guard let process else { return false }
-            return !Self.dockerStoppedStatuses.contains(process.state.status)
+            switch status {
+            case .starting, .running, .stopping:
+                return true
+            default:
+                return false
+            }
+        }
+    }
+    
+    private func ensureIsRunning() async throws {
+        if !(await isRunning) {
+            throw MCRError.executionError("The server is not running")
         }
     }
     
     /// Configuration for the Docker client with the parameters necessary to run the container
-    private var dockerConfig: ContainerSpec {
+    private var dockerConfig: Docker.ContainerSpec {
         // enviroment variables
-        var env = config.map { $0.environmentVariable }
-        env.append("EULA=true")
+        var environment = config.map { $0.environmentVariable }
+        environment.append("EULA=true")
         
         // volumes
-        let volumes: [String : ContainerConfig.EmptyObject] = [:]
+        var volumes = [String : String]()
+        for containerPath in Self.dockerVolumePaths {
+            let pathComponents = containerPath.split(separator: "/", maxSplits: 1)
+                .compactMap { String($0) }
+            guard pathComponents.count == 2 else { continue }
+            let hostPath = path.appendingPathComponent(pathComponents[1], isDirectory: true)
+            volumes[hostPath.path] = containerPath
+        }
+
+        // container name
+        let name = Self.processName(for: id)
         
         return .init(
-            config: .init(
-                image: dockerImageName,
-                environmentVars: env,
-                exposedPorts: [
-                    .tcp(Self.minecraftServerPort),
-                    .udp(Self.minecraftServerPort)
-                ],
-                volumes: volumes
-            ),
-            hostConfig: .init(
-                portBindings: [ // expose server on the host
-                    .tcp(Self.minecraftServerPort) : [.publishTo(hostIp: "0.0.0.0", hostPort: UInt16(port))],
-                    .udp(Self.minecraftServerPort) : [.publishTo(hostIp: "0.0.0.0", hostPort: UInt16(port))]
-                ]
-            )
+            environment: environment,
+            hostname: name,
+            name: name,
+            ports: [UInt(port):UInt(Self.minecraftServerPort)],
+            restartPolicy: .unlessStopped,
+            volumes: volumes
         )
+    }
+    
+    /// Ensure the server runtime (process) is the most up to date version by checkign the internal member processNeedsUpdate and create a new container of necessary
+    private func ensureRuntimeIsUpdated() async throws {
+        // If the process needs to be updated, create a new container
+        if processNeedsUpdate {
+            // remove the previous container
+            try await Docker.remove(container: process)
+            // create a new container using the current server runtime specs
+            self.process = try await Docker.create(
+                dockerConfig,
+                from: Self.dockerImage(version: version)
+            )
+            processNeedsUpdate = false
+        }
     }
     
     /// Start the server
     func start() async throws {
-        guard !(await isRunning) else {
+        if await isRunning {
             throw MCRError.executionError("The server is already running")
         }
+        try await ensureRuntimeIsUpdated()
+        // update status manually to notify the server is starting
         status = .starting
         do {
-            // create a new container for this runtime
-            let process = try await docker.containers.create(
-                name: processName,
-                spec: dockerConfig
-            )
-            try await docker.containers.start(process.id)
-            status = .running
-            self.process = process
+            try await Docker.start(process)
+            // TODO: Monitor startup so we can keep the status as `starting` as long as the server isn't ready, then sync with Docker
+            // update the status again to ensure we stay in sync with docker
+            await updateStatus()
         }
         catch {
             status = .error
@@ -225,16 +252,14 @@ final actor ServerRuntime: Identifiable {
     
     /// Stop the server
     func stop() async throws {
-        guard await isRunning, let process else {
-            throw MCRError.executionError("The server is not running")
-        }
+        try await ensureIsRunning()
+        // update status manually to notify the server is stopping
         status = .stopping
         do {
-            try await docker.containers.stop(process.id)
-            status = .stopped
-            // delete the container (this will be re-created the next time the server starts
-            try await docker.containers.remove(process.id)
-            self.process = nil
+            try await Docker.stop(process)
+            // TODO: Monitor shutdown so we can keep the status as `stopping` as long as the server isn't ready, then sync with Docker
+            // update the status again to ensure we stay in sync with docker
+            await updateStatus()
         }
         catch {
             status = .error
@@ -244,9 +269,7 @@ final actor ServerRuntime: Identifiable {
     
     /// Restart the server with an optional delay in seconds
     func restart(delay: UInt32? = nil) async throws {
-        guard await isRunning else {
-            throw MCRError.executionError("The server is not running")
-        }
+        try await ensureIsRunning()
         do {
             if let delay {
                 try await send(command: "/say The server will restart in \(delay.description) second(s)")
@@ -261,72 +284,54 @@ final actor ServerRuntime: Identifiable {
         }
     }
     
-    /// Send a commadn to the server
-    func send(command: String) async throws {
-        guard await isRunning, let process else {
-            throw MCRError.executionError("The server is not running")
+    /// Send a command to the server and get the result for it
+    @discardableResult
+    func send(command: String) async throws -> String {
+        try await ensureIsRunning()
+        /*
+         This is a tricky one, since we can't attach a container and sned a command and then detach easily,
+         so we resort to executing a few commands in the container:
+         1. Get the PID of the server process in the container (since we are using the same minecraft-server image they should all have the same name)
+            > top -n 1 | grep start_server.sh
+            1     0 root     S     143m   2%   0   0% {start_server.sh} /usr/bin/qemu-x8
+         2. The first number from the previous output is the PID, we can use that to inject string to the process stdin
+            > echo <minecraft_command> | /proc/<pid>/fd/0
+            <minecraft_command_output>
+         3. Make sure to wrap every command in (/bin/bash -c "<command>") to ensure we run in a working shell
+         */
+        let pid = try await Docker.exec("/bin/bash -c \"top -n 1 | grep \(Self.serverProcessName)\"", in: process)
+            .split(separator: " ")
+            .first
+        guard let pid else {
+            throw MCRError.failedToSendCommand
         }
         do {
-            let terminal = try await docker.containers.attach(container: process, stream: false, logs: false)
-            try await terminal.send(command)
+            return try await Docker.exec("/bin/bash -c \"echo \(command) | /proc/\(pid)/fd/0\"", in: process)
         }
         catch {
-            throw MCRError.dockerError(error)
+            throw MCRError.failedToSendCommand
         }
     }
     
-    func logs(tail: UInt? = nil) async throws -> String {
-        guard await isRunning, let process else {
-            throw MCRError.executionError("The server is not running")
-        }
-        return "Not implemented"
-//        do {
-//            for try await log in try await Self.docker.containers.logs(container: process, tail: tail) {
-//                return log.message
-//            }
-//        }
-//        catch {
-//            throw MCRError.dockerError(error)
-//        }
+    func logs(tail: UInt? = nil) async throws -> [String] {
+        try await Docker.logs(for: process, tail: tail)
     }
     
     // MARK: - Info
     
-    private var stats: ContainerStats? {
-        get async {
-            guard await isRunning, let process else {
-                return nil
-            }
-            return try? await docker.containers.stats(process.id).first(where: { _ in true })
-        }
-    }
-    
-    /// Get the CPU usage of the server process
-    private var cpuUsage: UInt64 {
-        get async {
-            await stats?.cpu.systemCpuUsage ?? 0
-        }
-    }
-    
-    /// Memory usage in bytes of the server process
-    private var memoryUsageBytes: UInt64 {
-        get async {
-            await stats?.memory.usage ?? 0
-        }
-    }
-    
     /// Info regarding the current server process
     var info: Server.Info {
-        get async {
+        get async throws {
             if !(await isRunning) {
                 // use this a chance to update the status if the server was stopped for any reason so we don't risk reporting an active status with nil stats
                 status = .stopped
             }
+            let stats = try await Docker.stats(of: process)
             return .init(
                 status: status,
                 onlinePlayerCount: 0,
-                cpuUsage: await cpuUsage,
-                memoryUsage: await memoryUsageBytes
+                cpuPercent: stats.cpuPercent,
+                memoryUsage: stats.memoryUsageBytes
             )
         }
     }
@@ -334,6 +339,11 @@ final actor ServerRuntime: Identifiable {
 
 // MARK: - Defaults
 extension ServerRuntime {
+    
+    /// Name for a server process
+    static func processName(for serverId: UUID) -> String {
+        return "mcmanager_server-\(serverId.pathSafeString)"
+    }
     
     /// Name of the server config file on disk
     static var configFileName: String { "config.json" }
@@ -344,8 +354,27 @@ extension ServerRuntime {
     /// Name of the server mods directory on disk
     static var modsDirectoryName: String { "mods" }
     
+    /// Docker container process for the given server name
+    static func process(for name: String) async -> Docker.Container? {
+        try? await Docker.containers.first {
+            $0.name == name
+        }
+    }
+    
+    /// Name of the Minecraft server image namespace in DockerHub
+    static var dockerHubNamespace: DockerHub.Namespace { "rdall96" }
+    
+    /// Name of the Minecraft server image repository in DockerHub
+    static var dockerHubRepositoryName: DockerHub.Repository.Name { "minecraft-server" }
+    
     /// Name of the server docker image
-    static var dockerImageName: String { "rdall96/minecraft-server" }
+    static func dockerImage(version: String) -> Docker.Image {
+        .init(
+            repository: Self.dockerHubNamespace,
+            name: Self.dockerHubRepositoryName,
+            tag: .init(version)
+        )
+    }
     
     /// Docker volume paths to map on the local host
     static var dockerVolumePaths: [String] {
@@ -358,10 +387,8 @@ extension ServerRuntime {
     /// Default Minecraft server port on the container
     static var minecraftServerPort: UInt16 { 25565 }
     
-    /// Docker container status for when the process is stopped
-    static var dockerStoppedStatuses: [Container.State.State] {
-        [.dead, .exited, .paused, .removing]
-    }
+    /// Name of the Minecraft server process in the docker container
+    static var serverProcessName: String { "start_server.sh" }
 }
 
 // MARK: - Equatable
@@ -369,6 +396,5 @@ extension ServerRuntime: Equatable {
     static func == (lhs: ServerRuntime, rhs: ServerRuntime) -> Bool {
         // same id, means this is the same server
         lhs.id == rhs.id
-        
     }
 }

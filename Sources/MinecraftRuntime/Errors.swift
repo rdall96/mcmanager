@@ -12,6 +12,7 @@ public enum MCRError: LocalizedError {
     case invalidServerType
     case duplicateServer(UUID?)
     case executionError(String)
+    case noServerRuntimeFound
     case downloadFailed
     case creationError
     case deletionError(String)
@@ -21,6 +22,7 @@ public enum MCRError: LocalizedError {
     case corruptedServerConfiguration(URL, Error)
     case invalidServerConfigKey(String)
     case dockerError(Error)
+    case failedToSendCommand
     
     public var errorDescription: String? {
         switch self {
@@ -32,6 +34,8 @@ public enum MCRError: LocalizedError {
             return "The server already exists"
         case .executionError(_):
             return "Server execution error"
+        case .noServerRuntimeFound:
+            return "No process found for the server"
         case .downloadFailed:
             return "Failed to download server"
         case .creationError:
@@ -50,6 +54,8 @@ public enum MCRError: LocalizedError {
             return "Invalid server configuration key"
         case .dockerError(_):
             return "Unknown server runtime error"
+        case .failedToSendCommand:
+            return "An error occurred when sending the command to the server"
         }
     }
     

@@ -214,7 +214,7 @@ struct ServerController: RouteCollection {
         return .ok
     }
     
-    func logs(req: Request) async throws -> String {
+    func logs(req: Request) async throws -> [String] {
         guard let serverId: UUID = req.parameters.get("serverID") else {
             throw Abort(.notFound)
         }
