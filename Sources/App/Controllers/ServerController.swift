@@ -75,6 +75,7 @@ struct ServerController: RouteCollection {
     
     func create(req: Request) async throws -> MCServer {
         let server = try req.content.decode(MCServer.self)
+        try await ensureIsValid(server: server, on: req.db)
         try await server.save(on: req.db)
         do {
             try await orchestra.add(server: server)
@@ -108,6 +109,7 @@ struct ServerController: RouteCollection {
         }
         server.updatedAt = .now
         
+        try await ensureIsValid(server: server, on: req.db)
         try await server.save(on: req.db)
         try await orchestra.update(server: server)
         return server
@@ -259,6 +261,15 @@ extension ServerController {
         let servers = try await MCServer.query(on: database).all()
         for server in servers {
             try await orchestra.add(server: server)
+        }
+    }
+    
+    /// Ensure the server is valid
+    func ensureIsValid(server: MCServer, on database: Database) async throws {
+        let settings = try await settings(on: database)
+        // check the server port
+        if !settings.allowedServerPortsData.contains(server.port) {
+            throw Abort(.badRequest, reason: "The selected server port is outside of the allowed range")
         }
     }
 }
