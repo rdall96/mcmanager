@@ -171,9 +171,9 @@ public final class ServerOrchestra {
     }
     
     /// Restart a server
-    public func restart(serverWithId serverId: UUID) async throws {
+    public func restart(serverWithId serverId: UUID, delay: UInt? = nil) async throws {
         let server = try requireServer(withId: serverId)
-        try await server.restart()
+        try await server.restart(delay: delay)
     }
     
     public func send(command: String, to serverId: UUID) async throws {

@@ -134,12 +134,9 @@ extension Server.Config {
     
     /// Read the server config at the given file path. If the config file can't be found, you can specify to create one using the default values
     static func read(at path: URL, createDefault: Bool = false) throws -> Set<Server.Config> {
+        // if the file doesn't exist, create it usign the defaults
         if !FileManager.default.fileExists(atPath: path.path), createDefault {
-            // create the default file
-            try? Server.Config.defaultData.write(to: path)
-        }
-        else {
-            throw MCRError.missingServerConfig(path)
+            try Server.Config.defaultData.write(to: path)
         }
         // read the file contents
         do {

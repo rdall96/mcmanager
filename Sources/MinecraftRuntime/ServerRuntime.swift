@@ -208,6 +208,7 @@ final actor ServerRuntime: Identifiable {
         return .init(
             environment: environment,
             hostname: name,
+            interactive: true, // we need this in order to send commands to the server process later
             name: name,
             ports: [UInt(port):UInt(Self.minecraftServerPort)],
             restartPolicy: .unlessStopped,
@@ -256,6 +257,7 @@ final actor ServerRuntime: Identifiable {
         // update status manually to notify the server is stopping
         status = .stopping
         do {
+            try await send(command: "stop")
             try await Docker.stop(process)
             // TODO: Monitor shutdown so we can keep the status as `stopping` as long as the server isn't ready, then sync with Docker
             // update the status again to ensure we stay in sync with docker
@@ -268,7 +270,7 @@ final actor ServerRuntime: Identifiable {
     }
     
     /// Restart the server with an optional delay in seconds
-    func restart(delay: UInt32? = nil) async throws {
+    func restart(delay: UInt? = nil) async throws {
         try await ensureIsRunning()
         do {
             if let delay {
@@ -289,13 +291,13 @@ final actor ServerRuntime: Identifiable {
     func send(command: String) async throws -> String {
         try await ensureIsRunning()
         /*
-         This is a tricky one, since we can't attach a container and sned a command and then detach easily,
+         This is a tricky one, since we can't attach a container and send a command and then detach easily,
          so we resort to executing a few commands in the container:
          1. Get the PID of the server process in the container (since we are using the same minecraft-server image they should all have the same name)
-            > top -n 1 | grep start_server.sh
+            $ top -n 1 | grep start_server.sh
             1     0 root     S     143m   2%   0   0% {start_server.sh} /usr/bin/qemu-x8
          2. The first number from the previous output is the PID, we can use that to inject string to the process stdin
-            > echo <minecraft_command> | /proc/<pid>/fd/0
+            $ echo <minecraft_command> > /proc/<pid>/fd/0
             <minecraft_command_output>
          3. Make sure to wrap every command in (/bin/bash -c "<command>") to ensure we run in a working shell
          */
@@ -306,7 +308,7 @@ final actor ServerRuntime: Identifiable {
             throw MCRError.failedToSendCommand
         }
         do {
-            return try await Docker.exec("/bin/bash -c \"echo \(command) | /proc/\(pid)/fd/0\"", in: process)
+            return try await Docker.exec("/bin/bash -c \"echo \(command) > /proc/\(pid)/fd/0\"", in: process)
         }
         catch {
             throw MCRError.failedToSendCommand

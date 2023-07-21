@@ -3,17 +3,26 @@ import Vapor
 import MCManager_Shared
 
 func routes(_ app: Application) async throws {
-    let settings = try await Settings.find(nil, on: app.db) ?? .defaults
-    try app.register(collection: API(settings: settings))
+    // load the system settings
+    let settings = try await Settings.query(on: app.db).all().first ?? .defaults
+    // create the parent API endpoint
+    let api = try API(settings: settings)
+    
+    // attempt to load the existing servers
+    try await api.serverController.loadExistingServers(from: app.db)
+    try app.register(collection: api)
 }
 
 // MARK: - API routes
 fileprivate struct API: RouteCollection {
     
     let settings: Settings
+    let serverController: ServerController
     
-    init(settings: Settings) {
+    init(settings: Settings) throws {
         self.settings = settings
+        let serversPath = try DirectoryConfiguration.detect().serversPath
+        serverController = try ServerController(serversPath: serversPath, settings: settings)
     }
     
     func boot(routes: RoutesBuilder) throws {
@@ -36,8 +45,6 @@ fileprivate struct API: RouteCollection {
         try api.register(collection: UserController())
         
         // servers
-        let serversPath = try DirectoryConfiguration.detect().serversPath
-        let serverController = try ServerController(serversPath: serversPath, settings: settings)
         try api.register(collection: serverController)
     }
 }
