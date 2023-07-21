@@ -22,7 +22,7 @@ fileprivate struct API: RouteCollection {
     init(version: Version) throws {
         self.version = version
         settingsController = SettingsController { _ in
-            // TODO: Update server routes with new settings
+            // Do any necessary updates that depend on the settings
         }
         userController = UserController()
         serverController = try ServerController(

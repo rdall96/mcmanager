@@ -125,9 +125,11 @@ struct ServerController: RouteCollection {
         try await server.delete(on: req.db)
         do {
             try await orchestra.delete(serverWithId: serverId)
+            // remove any status cache
+            try await ServerStatusCache.find(serverId, on: req.db)?.delete(on: req.db)
         }
         catch {
-            try await server.save(on: req.db)
+            try await server.restore(on: req.db)
             throw error
         }
         return .noContent
@@ -145,7 +147,27 @@ struct ServerController: RouteCollection {
         guard let serverId: UUID = req.parameters.get("serverID") else {
             throw Abort(.notFound)
         }
-        return try await orchestra.info(for: serverId)
+        
+        let settings = try await self.settings(on: req.db)
+        // Check if we have a valid cached value for this server status if the server status cache is enabled
+        if settings.serverStatusCacheIsEnabled {
+            let cachedStatus = try await ServerStatusCache.find(serverId, on: req.db)
+            if let cachedStatus, !cachedStatus.isExpired, let info = cachedStatus.serverInfo {
+                return info
+            }
+        }
+        
+        // get the server info and add it to the status cache if the service is enabled
+        let info = try await orchestra.info(for: serverId)
+        if settings.serverStatusCacheIsEnabled {
+            try await ServerStatusCache.find(serverId, on: req.db)?.delete(on: req.db)
+            try await ServerStatusCache(
+                id: serverId,
+                ttl: settings.serverStatusTTLSeconds,
+                data: info
+            ).save(on: req.db)
+        }
+        return info
     }
     
     // MARK: - Properties & config
@@ -197,6 +219,8 @@ struct ServerController: RouteCollection {
             throw Abort(.notFound)
         }
         try await orchestra.start(serverWithId: serverId)
+        // invalidate the status cache
+        try await ServerStatusCache.find(serverId, on: req.db)?.delete(on: req.db)
         return .ok
     }
     
@@ -205,6 +229,8 @@ struct ServerController: RouteCollection {
             throw Abort(.notFound)
         }
         try await orchestra.stop(serverWithId: serverId)
+        // invalidate the status cache
+        try await ServerStatusCache.find(serverId, on: req.db)?.delete(on: req.db)
         return .ok
     }
     
@@ -222,6 +248,8 @@ struct ServerController: RouteCollection {
         else {
             try await orchestra.restart(serverWithId: serverId)
         }
+        // invalidate the status cache
+        try await ServerStatusCache.find(serverId, on: req.db)?.delete(on: req.db)
         return .ok
     }
     

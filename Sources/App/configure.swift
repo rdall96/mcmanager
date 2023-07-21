@@ -71,6 +71,7 @@ fileprivate func migrateDatabase(_ app: Application) async throws {
     app.migrations.add(User.Migration())
     app.migrations.add(SessionToken.Migration())
     app.migrations.add(Server.Migration())
+    app.migrations.add(ServerStatusCache.Migration())
     
     // Migrate database
     try await app.autoMigrate()
