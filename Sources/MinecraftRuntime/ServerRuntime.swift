@@ -330,6 +330,7 @@ final actor ServerRuntime: Identifiable {
             let stats = try await Docker.stats(of: process)
             return .init(
                 status: status,
+                needsRestart: processNeedsUpdate,
                 onlinePlayerCount: 0,
                 cpuPercent: stats.cpuPercent,
                 memoryUsage: stats.memoryUsageBytes
