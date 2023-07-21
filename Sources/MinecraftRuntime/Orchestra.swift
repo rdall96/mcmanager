@@ -15,25 +15,18 @@ import DockerSwiftAPI
 public final class ServerOrchestra {
     
     private let serversRoot: URL
-    private var settings: Settings
     
     private var serverRuntimes: [UUID : ServerRuntime]
     
-    public init(serversRoot: URL, settings: Settings) throws {
+    public init(serversRoot: URL) throws {
         // create the servers root directory if it doesn't exist
         self.serversRoot = serversRoot
         try FileManager.default.createDirectory(at: serversRoot, withIntermediateDirectories: true)
         
-        self.settings = settings
         serverRuntimes = [:]
     }
     
     deinit {}
-    
-    public func update(settings: Settings) {
-        self.settings = settings
-        // TODO: Restart tasks that depend on the settings
-    }
     
     /// Clean up unused files on the system
     public func cleanup() async throws {

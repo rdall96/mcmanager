@@ -13,21 +13,10 @@ import MinecraftRuntime
 struct ServerController: RouteCollection {
     typealias MCServer = MCManager_Shared.Server
     
-    private let orchestra: ServerOrchestra
+    let orchestra: ServerOrchestra
     
-    init(serversPath: URL, settings: Settings) throws {
-        self.orchestra = try .init(serversRoot: serversPath, settings: settings)
-    }
-    
-    func settingsDidChange(_ settings: Settings) {
-        orchestra.update(settings: settings)
-    }
-    
-    func loadExistingServers(from database: Database) async throws {
-        let servers = try await MCServer.query(on: database).all()
-        for server in servers {
-            try await orchestra.add(server: server)
-        }
+    init(serversPath: URL) throws {
+        self.orchestra = try .init(serversRoot: serversPath)
     }
     
     func boot(routes: RoutesBuilder) throws {
@@ -254,5 +243,22 @@ struct ServerController: RouteCollection {
             tail = UInt(tailValue)
         }
         return try await orchestra.logs(for: serverId, tail: tail)
+    }
+}
+
+// MARK: - Helpers
+extension ServerController {
+    
+    // Fetch the most up-to-date service settings
+    func settings(on database: Database) async throws -> Settings {
+        try await Settings.query(on: database).all().first ?? .defaults
+    }
+    
+    /// Load all existing servers from the given database into the current runtime
+    func loadExistingServers(from database: Database) async throws {
+        let servers = try await MCServer.query(on: database).all()
+        for server in servers {
+            try await orchestra.add(server: server)
+        }
     }
 }

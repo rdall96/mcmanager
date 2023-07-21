@@ -32,7 +32,6 @@ final public class Settings: Model {
     /// Example: 12345,25500-25599,32210
     /// Note: Ports outside of the follwoing range will be automatically discarded as they are either invalid or reserved: 1024-65535
     public var allowedServerPorts: String
-    @_spi(MCManager_Server) public var allowedServerPortsData: Set<UInt16> = []
     
     public init() {}
     
@@ -42,16 +41,12 @@ final public class Settings: Model {
     ) {
         self.init()
         self.serverStatusTTLSeconds = serverStatusTTLSeconds
-        self.allowedServerPorts = allowedServerPorts
-        self.allowedServerPortsData = Self.expandServerPortRange(from: allowedServerPorts)
+        self.allowedServerPorts = allowedServerPorts.replacingOccurrences(of: " ", with: "")
     }
     
-    private static func expandServerPortRange(from text: String) -> Set<UInt16> {
+    @_spi(MCManager_Server) public var allowedServerPortsData: Set<UInt16> {
         var ports = Set<UInt16>()
-        let separatePorts = text
-            .replacingOccurrences(of: " ", with: "")
-            .split(separator: ",")
-        for portValue in separatePorts {
+        for portValue in allowedServerPorts.split(separator: ",") {
             // if the portValue contains a `-` then it's a range, otherwise it's a single value
             if portValue.contains("-") {
                 let portRangeValues = portValue.split(separator: "-", maxSplits: 1)

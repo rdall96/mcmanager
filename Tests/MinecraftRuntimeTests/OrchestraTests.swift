@@ -14,10 +14,7 @@ final class OrchestraTests: XCTestCase {
     var orchestra: ServerOrchestra!
     
     override func setUp() async throws {
-        orchestra = try .init(
-            serversRoot: FileManager.default.temporaryDirectory,
-            settings: .testDefaults
-        )
+        orchestra = try .init(serversRoot: FileManager.default.temporaryDirectory)
     }
     
     override func tearDown() async throws {

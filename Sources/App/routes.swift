@@ -3,10 +3,8 @@ import Vapor
 import MCManager_Shared
 
 func routes(_ app: Application) async throws {
-    // load the system settings
-    let settings = try await Settings.query(on: app.db).all().first ?? .defaults
     // create the parent API endpoint
-    let api = try API(settings: settings)
+    let api = try API(version: .current)
     
     // attempt to load the existing servers
     try await api.serverController.loadExistingServers(from: app.db)
@@ -16,35 +14,31 @@ func routes(_ app: Application) async throws {
 // MARK: - API routes
 fileprivate struct API: RouteCollection {
     
-    let settings: Settings
+    let version: Version
+    let settingsController: SettingsController
+    let userController: UserController
     let serverController: ServerController
     
-    init(settings: Settings) throws {
-        self.settings = settings
-        let serversPath = try DirectoryConfiguration.detect().serversPath
-        serverController = try ServerController(serversPath: serversPath, settings: settings)
+    init(version: Version) throws {
+        self.version = version
+        settingsController = SettingsController { _ in
+            // TODO: Update server routes with new settings
+        }
+        userController = UserController()
+        serverController = try ServerController(
+            serversPath: try DirectoryConfiguration.detect().serversPath
+        )
     }
     
     func boot(routes: RoutesBuilder) throws {
         let api = routes.grouped("api")
         
         // Register all API routes
-        
-        // version
         api.get("version") { _ async in
-            Version.current.description
-        }
-        
-        // settings
-        let settingsController = SettingsController() { newSettings in
-            // TODO: Update server routes with new settings
+            version.description
         }
         try api.register(collection: settingsController)
-        
-        // users
-        try api.register(collection: UserController())
-        
-        // servers
+        try api.register(collection: userController)
         try api.register(collection: serverController)
     }
 }
