@@ -221,11 +221,16 @@ struct ServerController: RouteCollection {
         guard let serverId: UUID = req.parameters.get("serverID") else {
             throw Abort(.notFound)
         }
-        var delay: UInt? = nil
-        if let delayValue = req.query[UInt.self, at: "delay"] {
-            delay = UInt(delayValue)
+        // if we have a delay, we don't want to block this request for the lenght of that time as it can easily go over the client timeout,
+        // so we launch it in a background task
+        if let delay = req.query[UInt.self, at: "delay"] {
+            Task(priority: .userInitiated) {
+                try await orchestra.restart(serverWithId: serverId, delay: delay)
+            }
         }
-        try await orchestra.restart(serverWithId: serverId, delay: delay)
+        else {
+            try await orchestra.restart(serverWithId: serverId)
+        }
         return .ok
     }
     

@@ -10,6 +10,7 @@ import Foundation
 import DockerSwiftAPI
 
 final actor ServerRuntime: Identifiable {
+    typealias Command = String
     
     /// ID of the server
     let id: UUID
@@ -274,7 +275,7 @@ final actor ServerRuntime: Identifiable {
         try await ensureIsRunning()
         do {
             if let delay {
-                try await send(command: "/say The server will restart in \(delay.description) second(s)")
+                try await send(command: "/say The server will restart in \(delay) second(s)")
                 try await Task.sleep(seconds: delay)
             }
             try await stop()
@@ -285,9 +286,8 @@ final actor ServerRuntime: Identifiable {
         }
     }
     
-    /// Send a command to the server and get the result for it
-    @discardableResult
-    func send(command: String) async throws -> String {
+    /// Send a command to the server
+    func send(command: Command) async throws {
         try await ensureIsRunning()
         /*
          This is a tricky one, since we can't attach a container and send a command and then detach easily,
@@ -307,7 +307,7 @@ final actor ServerRuntime: Identifiable {
             throw MCRError.failedToSendCommand
         }
         do {
-            return try await Docker.exec("/bin/bash -c \"echo \(command) > /proc/\(pid)/fd/0\"", in: process)
+            try await Docker.exec("/bin/bash -c \"echo \(command.sanitized) > /proc/\(pid)/fd/0\"", in: process)
         }
         catch {
             throw MCRError.failedToSendCommand
@@ -397,5 +397,25 @@ extension ServerRuntime: Equatable {
     static func == (lhs: ServerRuntime, rhs: ServerRuntime) -> Bool {
         // same id, means this is the same server
         lhs.id == rhs.id
+    }
+}
+
+// MARK: - Sanitize commands
+extension ServerRuntime.Command {
+    fileprivate var sanitized: ServerRuntime.Command {
+        self
+            .replacingOccurrences(of: "(", with: "\\(") // bash interprets ( and ) as something else (idk)
+            .replacingOccurrences(of: ")", with: "\\)")
+            .replacingOccurrences(of: "<", with: "\\<")
+            .replacingOccurrences(of: ">", with: "\\>")
+            .replacingOccurrences(of: "#", with: "\\#") // these won't forward the command to the process stdin because they signal the end of a command in bash
+            .replacingOccurrences(of: ";", with: "\\;")
+            .replacingOccurrences(of: "|", with: "\\|")
+            .replacingOccurrences(of: "*", with: "\\*") // * will list all files in the server directory
+            .replacingOccurrences(of: "~", with: "\\~") // ~ will list files under the user path
+            .replacingOccurrences(of: "`", with: "") // backticks will straight up break the command
+            .replacingOccurrences(of: "$\\(", with: "") // wrapping other text in $() will execute another shell command, we don't have a good way to prevent it, so let's break that fucntionality by removing it
+            .replacingOccurrences(of: "\"", with: "\\\("\"")") // double quotes will mess up the command structure, so escape them (this replaces " with \")
+            .replacingOccurrences(of: "'", with: "\'") // the same goes for single quotes
     }
 }
