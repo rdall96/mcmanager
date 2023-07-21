@@ -66,7 +66,22 @@ struct ServerController: RouteCollection {
     // MARK: - Server management
     
     func all(req: Request) async throws -> [MCServer] {
-        try await MCServer.query(on: req.db).all()
+        var filters = [DatabaseQuery.Filter]()
+        
+        // server type filter
+        if let serverType = req.query[MCServer.ServerType.self, at: "type"] {
+            filters.append(.value(
+                .path([MCServer.FieldKeys.type.rawValue], schema: MCServer.schema),
+                .equal,
+                .enumCase(serverType.rawValue)
+            ))
+        }
+        
+        var query = MCServer.query(on: req.db)
+        for filter in filters {
+            query = query.filter(filter)
+        }
+        return try await query.all()
     }
     
     func create(req: Request) async throws -> MCServer {
@@ -207,7 +222,7 @@ struct ServerController: RouteCollection {
             throw Abort(.notFound)
         }
         var delay: UInt? = nil
-        if let delayValue = req.parameters.get("delay") {
+        if let delayValue = req.query[UInt.self, at: "delay"] {
             delay = UInt(delayValue)
         }
         try await orchestra.restart(serverWithId: serverId, delay: delay)
@@ -230,7 +245,7 @@ struct ServerController: RouteCollection {
             throw Abort(.notFound)
         }
         var tail: UInt? = nil
-        if let tailValue = req.parameters.get("tail") {
+        if let tailValue = req.query[UInt.self, at: "tail"] {
             tail = UInt(tailValue)
         }
         return try await orchestra.logs(for: serverId, tail: tail)
