@@ -37,7 +37,8 @@ enum TestData {
 extension Settings {
     static var testDefaults: Settings {
         .init(
-            serverStatusTTLSeconds: 1
+            serverStatusTTLSeconds: 1,
+            allowedServerPorts: "1023-65535"
         )
     }
 }

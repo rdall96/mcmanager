@@ -14,6 +14,7 @@ extension Settings {
             try await database.schema(Settings.schema)
                 .id()
                 .field(Settings.FieldKeys.serverStatusTTLSeconds.rawValue, .uint, .required)
+                .field(Settings.FieldKeys.allowedServerPorts.rawValue, .string, .required)
                 .create()
         }
         

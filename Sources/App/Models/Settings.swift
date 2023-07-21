@@ -14,7 +14,8 @@ extension Settings: Content {}
 extension Settings {
     static var defaults: Settings {
         .init(
-            serverStatusTTLSeconds: 5
+            serverStatusTTLSeconds: 5,
+            allowedServerPorts: "\(Settings.validPortRange.lowerBound)-\(Settings.validPortRange.upperBound)"
         )
     }
 }
