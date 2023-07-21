@@ -161,6 +161,17 @@ public final class ServerOrchestra {
     /// Start a server
     public func start(serverWithId serverId: UUID) async throws {
         let server = try requireServer(withId: serverId)
+        // ensure the server isn't already running
+        if await server.isRunning {
+            throw MCRError.executionError("This server is already running")
+        }
+        // check if this port is already in use by another running server
+        let serverPort = await server.port
+        for runtime in serverRuntimes.values {
+            if await runtime.isRunning, await runtime.port == serverPort {
+                throw MCRError.executionError("This port is already in use by another server")
+            }
+        }
         try await server.start()
     }
     

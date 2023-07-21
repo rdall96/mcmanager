@@ -168,7 +168,7 @@ final actor ServerRuntime: Identifiable {
     }
     
     /// Check if the process is running
-    private var isRunning: Bool {
+    var isRunning: Bool {
         get async {
             await updateStatus()
             switch status {
@@ -275,8 +275,7 @@ final actor ServerRuntime: Identifiable {
         do {
             if let delay {
                 try await send(command: "/say The server will restart in \(delay.description) second(s)")
-                let sleepTime: UInt64 = UInt64(delay * 1000 * 1000)
-                try await Task.sleep(nanoseconds: sleepTime)
+                try await Task.sleep(seconds: delay)
             }
             try await stop()
             try await start()
