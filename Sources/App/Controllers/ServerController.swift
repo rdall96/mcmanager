@@ -163,7 +163,7 @@ struct ServerController: RouteCollection {
             try await ServerStatusCache.find(serverId, on: req.db)?.delete(on: req.db)
             try await ServerStatusCache(
                 id: serverId,
-                ttl: settings.serverStatusTTLSeconds,
+                ttl: settings.serverInfoCacheTTLSeconds,
                 data: info
             ).save(on: req.db)
         }
