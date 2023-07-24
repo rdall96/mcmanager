@@ -15,7 +15,7 @@ let package = Package(
         // JWT for authentication
         .package(url: "https://github.com/vapor/jwt.git", from: "4.2.2"),
         // Docker api
-        .package(url: "https://gitlab.com/rdall96/docker-swift-api", branch: "dev"),
+        .package(url: "https://gitlab.com/rdall96/docker-swift-api", from: "1.0.0"),
         // Swift commands
         .package(url: "https://github.com/qiuzhifei/swift-commands", from: "0.6.0"),
     ],
