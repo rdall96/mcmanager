@@ -61,8 +61,6 @@ RUN export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true \
     # libxml2 \
   && rm -r /var/lib/apt/lists/*
 
-# Create a docker group
-RUN groupadd docker
 # Create an mcmanager user and group with $MCMANAGER_HOME as its home directory
 RUN useradd --user-group --create-home --system --skel /dev/null --home-dir ${MCMANAGER_HOME} mcmanager
 # Add the mcmanager user to the docker group
