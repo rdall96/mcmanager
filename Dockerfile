@@ -72,8 +72,8 @@ WORKDIR ${MCMANAGER_HOME}
 # Copy built executable and any staged resources from builder
 COPY --from=build --chown=mcmanager:mcmanager /staging ${MCMANAGER_HOME}
 
-# Ensure all further commands run as the mcmanager user
-USER mcmanager:mcmanager
+# Ensure all further commands run as the mcmanager user with the docker group
+USER mcmanager:docker
 
 # Let Docker bind to port 8000
 EXPOSE 8000
