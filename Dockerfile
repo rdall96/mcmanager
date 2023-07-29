@@ -62,19 +62,18 @@ RUN export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true \
   && rm -r /var/lib/apt/lists/*
 
 # Create an mcmanager user and group with $MCMANAGER_HOME as its home directory
-# RUN useradd --user-group --create-home --system --skel /dev/null --home-dir ${MCMANAGER_HOME} mcmanager
+RUN useradd --user-group --create-home --system --skel /dev/null --home-dir ${MCMANAGER_HOME} mcmanager
 # Add the mcmanager user to the docker group
-# RUN usermod -aG docker mcmanager
+RUN usermod -aG docker mcmanager
 
 # Switch to the new home directory
 WORKDIR ${MCMANAGER_HOME}
 
 # Copy built executable and any staged resources from builder
-# COPY --from=build --chown=mcmanager:mcmanager /staging ${MCMANAGER_HOME}
-COPY --from=build /staging ${MCMANAGER_HOME}
+COPY --from=build --chown=mcmanager:mcmanager /staging ${MCMANAGER_HOME}
 
 # Ensure all further commands run as the mcmanager user with the docker group
-# USER mcmanager:docker
+USER mcmanager:docker
 
 # Let Docker bind to port 8000
 EXPOSE 8000
