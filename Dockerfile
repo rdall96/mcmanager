@@ -3,10 +3,15 @@
 # ================================
 FROM swift:5.8-jammy as build
 
+ARG C_OPTIMIZATION="-O2" \
+  BUILD_TYPE="release"
+
 # Install OS updates and, if needed, sqlite3
 RUN export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true \
   && apt update \
-  && apt dist-upgrade -y\
+  && apt dist-upgrade -y \
+  && apt install -y \
+    musl-dev \
   && rm -rf /var/lib/apt/lists/*
 
 # Set up a build area
@@ -23,18 +28,32 @@ RUN swift package resolve
 COPY . .
 
 # Build everything, with optimizations
-RUN swift build -c release --static-swift-stdlib
+RUN swift build \
+  -c ${BUILD_TYPE} \
+  -Xcc ${C_OPTIMIZATION} \
+  --static-swift-stdlib
 
 # Switch to the staging area
 WORKDIR /staging
 
 # Copy main executable to staging area
-RUN cp "$(swift build --package-path /build -c release --show-bin-path)/App" ./ \
+RUN cp \
+  "$(swift build \
+    --package-path /build \
+    -c ${BUILD_TYPE} \
+    -Xcc ${C_OPTIMIZATION} \
+    --show-bin-path)/App" ./ \
   # Rename the executable
   && mv App mcmanager
 
 # Copy resources bundled by SPM to staging area
-RUN find -L "$(swift build --package-path /build -c release --show-bin-path)/" -regex '.*\.resources$' -exec cp -Ra {} ./ \;
+RUN find -L \
+  "$(swift build \
+    --package-path /build \
+    -c ${BUILD_TYPE} \
+    -Xcc ${C_OPTIMIZATION} \
+    --show-bin-path)/" \
+  -regex '.*\.resources$' -exec cp -Ra {} ./ \;
 
 # Copy any resources from the public directory and views directory if the directories exist
 # Ensure that by default, neither the directory nor any of its contents are writable.
@@ -59,10 +78,7 @@ RUN export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true \
     tzdata \
     curl \
     gnupg \
-# If your app or its dependencies import FoundationNetworking, also install `libcurl4`.
-    # libcurl4 \
-# If your app or its dependencies import FoundationXML, also install `libxml2`.
-    # libxml2 \
+  # install docker
   && install -m 0755 -d /etc/apt/keyrings \
   && curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
   && chmod a+r /etc/apt/keyrings/docker.gpg \
@@ -73,6 +89,7 @@ RUN export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true \
   && apt update \
   && apt install -y \
     docker-ce \
+  # remove apt lists to prevent further updates
   && rm -r /var/lib/apt/lists/*
 
 # Create a user and group with $MCMANAGER_HOME as its home directory
@@ -88,7 +105,7 @@ COPY --from=build --chown=${MCMANAGER_USER}:${MCMANAGER_USER} /staging ${MCMANAG
 
 # Container settings
 EXPOSE 8000
-USER ${MCMANAGER_USER}
+# USER ${MCMANAGER_USER}
 
 # Start the service when the image is run, default to listening on 8000 in production environment
 ENTRYPOINT ["./mcmanager"]

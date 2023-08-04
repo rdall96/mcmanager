@@ -1,2 +1,5 @@
+.DS_Store
 .build/
 .swiftpm/
+.gitignore
+.gitlab-ci.yml
