@@ -42,9 +42,7 @@ RUN cp \
     --package-path /build \
     -c ${BUILD_TYPE} \
     -Xcc ${C_OPTIMIZATION} \
-    --show-bin-path)/App" ./ \
-  # Rename the executable
-  && mv App mcmanager
+    --show-bin-path)/MCManager" ./
 
 # Copy resources bundled by SPM to staging area
 RUN find -L \
@@ -108,6 +106,6 @@ EXPOSE 8000
 # USER ${MCMANAGER_USER}
 
 # Start the service when the image is run, default to listening on 8000 in production environment
-ENTRYPOINT ["./mcmanager"]
+ENTRYPOINT ["./MCManager"]
 VOLUME [ ${MCMANAGER_DATA} ]
 CMD ["serve", "--env", "production", "--hostname", "0.0.0.0", "--port", "8000"]

@@ -56,7 +56,7 @@ let package = Package(
         
         // Web server
         .executableTarget(
-            name: "App",
+            name: "MCManager",
             dependencies: [
                 .target(name: "MCManager-Shared"),
                 .target(name: "MinecraftRuntime"),
@@ -66,6 +66,7 @@ let package = Package(
                 .product(name: "JWT", package: "jwt"),
                 .product(name: "Commands", package: "swift-commands"),
             ],
+            path: "Sources/App",
             swiftSettings: [
                 // Enable better optimizations when building in Release configuration. Despite the use of
                 // the `.unsafeFlags` construct required by SwiftPM, this flag is recommended for Release
@@ -74,11 +75,12 @@ let package = Package(
             ]
         ),
         .testTarget(
-            name: "AppTests",
+            name: "MCManagerTests",
             dependencies: [
-                .target(name: "App"),
+                .target(name: "MCManager"),
                 .product(name: "XCTVapor", package: "vapor"),
-            ]
+            ],
+            path: "Tests/AppTests"
         )
     ]
 )
