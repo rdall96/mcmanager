@@ -8,5 +8,5 @@
 import Vapor
 
 struct ClientSession: Content {
-    var access: String
+    var accessToken: String
 }

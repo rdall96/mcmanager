@@ -16,6 +16,7 @@ fileprivate struct API: RouteCollection {
     
     let version: Version
     let settingsController: SettingsController
+    let authenticationController: AuthenticationController
     let userController: UserController
     let serverController: ServerController
     
@@ -24,6 +25,7 @@ fileprivate struct API: RouteCollection {
         settingsController = SettingsController { _ in
             // Do any necessary updates that depend on the settings
         }
+        authenticationController = AuthenticationController()
         userController = UserController()
         serverController = try ServerController(
             serversPath: try DirectoryConfiguration.detect().serversPath
@@ -37,6 +39,7 @@ fileprivate struct API: RouteCollection {
         api.get("version") { _ async in
             version.description
         }
+        try api.register(collection: authenticationController)
         try api.register(collection: settingsController)
         try api.register(collection: userController)
         try api.register(collection: serverController)

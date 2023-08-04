@@ -24,25 +24,20 @@ public func configure(_ app: Application) async throws {
     try await firstTimeSetup(app)
     
     // Security
-//    try setupKeys(app)
+    try await setupKeys(app)
     
     // Register routes
     try await routes(app)
 }
 
-fileprivate func setupKeys(_ app: Application) throws {
+fileprivate func setupKeys(_ app: Application) async throws {
     let privateKeyPath = try app.directory.privateKeyPath
     if !FileManager.default.fileExists(atPath: privateKeyPath.path) {
-        app.directory.generateKeys(at: privateKeyPath)
+        await app.directory.generateKeys(at: privateKeyPath)
     }
-    let privateKey = try String(contentsOfFile: privateKeyPath.path)
-    let privateSigner = try JWTSigner.rs256(key: .private(pem: privateKey.bytes))
-    
-    let publicKey = try String(contentsOfFile: try app.directory.publicKeyPath.path)
-    let publicSigner = try JWTSigner.rs256(key: .public(pem: publicKey.bytes))
-    
-    app.jwt.signers.use(privateSigner, kid: .private)
-    app.jwt.signers.use(publicSigner, kid: .public, isDefault: true)
+    let key = try String(contentsOfFile: try app.directory.publicKeyPath.path)
+    let keySigner = JWTSigner.hs256(key: key)
+    app.jwt.signers.use(keySigner, kid: .init(string: "default"), isDefault: true)
 }
 
 extension String {

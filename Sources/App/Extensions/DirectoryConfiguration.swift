@@ -45,18 +45,35 @@ extension DirectoryConfiguration {
     /// Path to the public key file
     var publicKeyPath: URL {
         get throws {
-            try privateKeyPath.appendingPathExtension(".pub")
+            try privateKeyPath.appendingPathExtension("pub")
         }
     }
     
-    func generateKeys(at path: URL) {
-        _ = Commands.Bash.run("ssh-keygen -t rsa-sha2-256 -b 2048 -f \"\(path.path)\" -N \"mcmanager\"")
+    func generateKeys(at path: URL) async {
+        await Shell.run("ssh-keygen -t rsa-sha2-256 -b 2048 -f \"\(path.path)\" -N \"mcmanager\"")
     }
     
     /// Path where the servers are stored
     var serversPath: URL {
         get throws {
             try dataPath(for: "servers")
+        }
+    }
+}
+
+fileprivate enum Shell {
+    @discardableResult
+    static func run(_ command: String) async -> String {
+        await withCheckedContinuation { continuation in
+            let result = Commands.Bash.run(
+                .init(command),
+                environment: .global
+            )
+            if result.isFailure {
+                continuation.resume(returning: result.errorOutput)
+                return
+            }
+            continuation.resume(returning: result.output)
         }
     }
 }

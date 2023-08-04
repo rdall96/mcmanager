@@ -11,18 +11,23 @@ import MCManager_Shared
 
 struct AuthenticationController: RouteCollection {
     func boot(routes: RoutesBuilder) throws {
-        let login = routes.grouped(User.asyncCredentialsAuthenticator(), User.guardMiddleware())
-        login.post("login") { req -> ClientSession in
-            let requestUser = try req.content.decode(User.self)
-            let user = try await User.query(on: req.db).all()
-                .first(where: { $0.username == requestUser.username })
-            guard let user,
-                  let token = SessionToken.token(for: user)
-            else {
-                throw Abort(.unauthorized)
-            }
-            try await token.save(on: req.db)
-            return .init(access: try req.jwt.sign(token))
+        let auth = routes.grouped(User.asyncCredentialsAuthenticator(), User.guardMiddleware())
+        auth.post("login", use: login)
+    }
+    
+    /// Login request
+    func login(req: Request) async throws -> ClientSession {
+        let user = try req.auth.require(User.self)
+        guard let payload = SessionToken.token(for: user) else {
+            throw Abort(.unauthorized)
         }
+        try await payload.save(on: req.db)
+        let token = try req.jwt.sign(payload)
+        return .init(accessToken: token)
+    }
+    
+    /// Refresh authentication token
+    func refresh(req: Request) async throws -> ClientSession {
+        throw Abort(.notImplemented)
     }
 }

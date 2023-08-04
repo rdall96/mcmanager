@@ -63,7 +63,7 @@ extension SessionToken {
     static func token(for user: User) -> SessionToken? {
         guard let userId = user.id else { return nil }
         let currentDate: Date = .now
-        let expirationDate = currentDate.addingTimeInterval(1 * 24 * 60 * 60) // 1 day
+        let expirationDate = Self.accessExpiration(for: currentDate)
         return .init(
             sub: .init(value: "mcmanager"),
             userId: userId,
@@ -71,6 +71,20 @@ extension SessionToken {
             iat: .init(value: currentDate),
             exp: .init(value: expirationDate)
         )
+    }
+}
+
+// MARK: - Constants
+extension SessionToken {
+    
+    /// Access token duration (default: 24H)
+    static var accessTokenTTL: TimeInterval {
+        1 * 24 * 60 * 60 // 1 day (24 hours)
+    }
+    
+    /// Calculate the expiration date
+    static func accessExpiration(for referenceDate: Date) -> Date {
+        referenceDate.addingTimeInterval(accessTokenTTL)
     }
 }
 
@@ -84,9 +98,12 @@ extension SessionToken: Equatable {
     }
 }
 
+// MARK: - Authenticatable
+extension SessionToken: Authenticatable {}
+
 // MARK: - JWTPayload
 extension SessionToken: JWTPayload {
     func verify(using signer: JWTSigner) throws {
-        try self.exp.verifyNotExpired()
+        try exp.verifyNotExpired()
     }
 }
