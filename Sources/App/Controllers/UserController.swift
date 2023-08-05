@@ -27,19 +27,19 @@ struct UserController: RouteCollection {
     
     // MARK: - Helpers
     
-    private func currentUser(for req: Request) async throws -> User {
+    private func currentUser(for req: Request) throws -> User {
         try req.auth.require(User.self)
     }
     
     private func hasCreatePermission(for req: Request) async throws -> Bool {
         // only adminds can create new users
-        let currentUser = try await currentUser(for: req)
+        let currentUser = try currentUser(for: req)
         return currentUser.isAdmin
     }
     
     private func hasEditPermissions(_ user: User, for req: Request) async throws -> Bool {
         // only self (the current user) or an admin can edit the user
-        let currentUser = try await currentUser(for: req)
+        let currentUser = try currentUser(for: req)
         return currentUser.id == user.id || currentUser.isAdmin
     }
     
@@ -89,7 +89,7 @@ struct UserController: RouteCollection {
     
     /// Get infor for the current signed-in user
     func me(req: Request) async throws -> User {
-        try await currentUser(for: req)
+        try currentUser(for: req)
     }
     
     /// Update info for a user

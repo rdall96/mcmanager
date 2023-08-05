@@ -15,17 +15,34 @@ struct SettingsController: RouteCollection {
     let onUpdate: (Settings) -> Void
     
     func boot(routes: RoutesBuilder) throws {
-        let settings = routes.grouped("settings")
+        let settings = routes
+            .grouped(SessionToken.Authenticator())
+            .grouped(User.guardMiddleware())
+            .grouped("settings")
         settings.get(use: `get`)
         settings.put(use: update)
     }
     
+    // MARK: - Helpers
+    
+    private func checkPermissions(for req: Request) throws {
+        let user = try req.auth.require(User.self)
+        // only admins can view/edit settings
+        guard user.isAdmin else {
+            throw Abort(.unauthorized)
+        }
+    }
+    
+    // MARK: - Routes
+    
     func get(req: Request) async throws -> Settings {
+        try checkPermissions(for: req)
         let all = try await Settings.query(on: req.db).all()
         return all.first ?? .defaults
     }
     
     func update(req: Request) async throws -> HTTPStatus {
+        try checkPermissions(for: req)
         // check if the given settigns are valid
         let settings = try req.content.decode(Settings.self)
         // delete all other entries
