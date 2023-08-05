@@ -20,18 +20,6 @@ extension User: ModelCredentialsAuthenticatable {
     }
 }
 
-struct UserAuthenticator: AsyncBearerAuthenticator {
-    func authenticate(bearer: BearerAuthorization, for request: Request) async throws {
-        let jwt = try request.jwt.verify(bearer.token, as: SessionToken.self)
-        if try await SessionToken.find(jwt.id, on: request.db) == jwt {
-            request.auth.login(jwt.user)
-        }
-        else {
-            throw Abort(.unauthorized)
-        }
-    }
-}
-
 // MARK: Password hashing
 extension User {
     /// Hash the password

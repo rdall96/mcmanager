@@ -92,7 +92,7 @@ extension SessionToken {
 extension SessionToken: Equatable {
     static func == (lhs: SessionToken, rhs: SessionToken) -> Bool {
         lhs.id == rhs.id &&
-        lhs.user.id == rhs.user.id &&
+        lhs.$user.id == rhs.$user.id &&
         lhs.iat.value == rhs.iat.value &&
         lhs.exp.value == rhs.exp.value
     }
@@ -104,6 +104,25 @@ extension SessionToken: Authenticatable {}
 // MARK: - JWTPayload
 extension SessionToken: JWTPayload {
     func verify(using signer: JWTSigner) throws {
+        // ensure the JWT is not expired
         try exp.verifyNotExpired()
+    }
+}
+
+// MARK: - AsyncBearerAuthenticator
+extension SessionToken {
+    struct Authenticator: AsyncBearerAuthenticator {
+        func authenticate(bearer: BearerAuthorization, for request: Request) async throws {
+            // ensure it's the right type of jwt
+            let jwt = try request.jwt.verify(as: SessionToken.self)
+            // ensure this token exists on the database (this will also ensure it's signed correctly)
+            let storedJwt = try await SessionToken.find(jwt.id, on: request.db)
+            guard let storedJwt, try storedJwt.requireID() == jwt.id else {
+                throw Abort(.unauthorized)
+            }
+            // TODO: Ensure this JWT is properly signed
+            let user = try await storedJwt.$user.get(on: request.db)
+            request.auth.login(user)
+        }
     }
 }
