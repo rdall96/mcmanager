@@ -11,8 +11,15 @@ import MCManager_Shared
 
 struct AuthenticationController: RouteCollection {
     func boot(routes: RoutesBuilder) throws {
-        let auth = routes.grouped(User.asyncCredentialsAuthenticator(), User.guardMiddleware())
-        auth.post("login", use: login)
+        routes
+            .grouped(User.asyncCredentialsAuthenticator())
+            .grouped(User.guardMiddleware())
+            .post("login", use: login)
+        
+        routes
+            .grouped(SessionToken.Authenticator())
+            .grouped(User.guardMiddleware())
+            .get("logout", use: logout)
     }
     
     /// Login request
@@ -26,8 +33,18 @@ struct AuthenticationController: RouteCollection {
         return .init(accessToken: token)
     }
     
-    /// Refresh authentication token
-    func refresh(req: Request) async throws -> ClientSession {
-        throw Abort(.notImplemented)
+    /// Logout the current session
+    func logout(req: Request) async throws -> HTTPStatus {
+        let user = try req.auth.require(User.self)
+        // delete any existing session for this user
+        let sessionTokens = try await SessionToken.query(on: req.db)
+            .filter(\.$user.$id, .equal, try user.requireID())
+            .all()
+        for sessionToken in sessionTokens {
+            try await sessionToken.delete(on: req.db)
+        }
+        // logout
+        req.auth.logout(User.self)
+        return .noContent
     }
 }
