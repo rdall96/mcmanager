@@ -20,7 +20,10 @@ struct ServerController: RouteCollection {
     }
     
     func boot(routes: RoutesBuilder) throws {
-        let servers = routes.grouped("servers")
+        let servers = routes
+            .grouped(SessionToken.Authenticator())
+            .grouped(User.guardMiddleware())
+            .grouped("servers")
         
         // management
         servers.get(use: all)
