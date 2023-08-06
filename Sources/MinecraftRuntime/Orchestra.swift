@@ -111,10 +111,16 @@ public final class ServerOrchestra {
     
     // MARK: - Status
     
-    /// Get the status for a specific server
+    /// Information regarding the currect server process
     public func info(for serverId: UUID) async throws -> Server.Info {
         let server = try requireServer(withId: serverId)
         return try await server.info
+    }
+    
+    /// Usage metrics for the current server process
+    public func metrics(for serverId: UUID) async throws -> Server.Metrics {
+        let server = try requireServer(withId: serverId)
+        return try await server.metrics
     }
     
     // MARK: - Properties & config

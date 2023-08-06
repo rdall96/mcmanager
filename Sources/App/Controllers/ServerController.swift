@@ -34,7 +34,8 @@ struct ServerController: RouteCollection {
             server.delete(use: delete)
             
             // status
-            server.get("status", use: status)
+            server.get("info", use: info)
+            server.get("metrics", use: metrics)
             
             // properties & config
             server.get("configuration", use: config)
@@ -146,31 +147,50 @@ struct ServerController: RouteCollection {
     
     // MARK: - Status
     
-    func status(req: Request) async throws -> MCServer.Info {
+    private func serverStatus(for serverId: UUID, on database: Database) async throws -> ServerStatusCache? {
+        let settings = try await self.settings(on: database)
+        guard settings.serverStatusCacheIsEnabled else {
+            return nil
+        }
+        let cachedStatus = try await ServerStatusCache.find(serverId, on: database)
+        if let cachedStatus, !cachedStatus.isExpired {
+            return cachedStatus
+        }
+        else {
+            // delete any previous cached status
+            try await cachedStatus?.delete(on: database)
+            // create a new cache
+            let status = ServerStatusCache(
+                id: serverId,
+                ttl: settings.serverInfoCacheTTLSeconds,
+                info: try await orchestra.info(for: serverId),
+                metrics: try await orchestra.metrics(for: serverId)
+            )
+            try await status.save(on: database)
+            return status
+        }
+    }
+    
+    func info(req: Request) async throws -> MCServer.Info {
         guard let serverId: UUID = req.parameters.get("serverID") else {
             throw Abort(.notFound)
         }
         
-        let settings = try await self.settings(on: req.db)
-        // Check if we have a valid cached value for this server status if the server status cache is enabled
-        if settings.serverStatusCacheIsEnabled {
-            let cachedStatus = try await ServerStatusCache.find(serverId, on: req.db)
-            if let cachedStatus, !cachedStatus.isExpired, let info = cachedStatus.serverInfo {
-                return info
-            }
-        }
-        
-        // get the server info and add it to the status cache if the service is enabled
-        let info = try await orchestra.info(for: serverId)
-        if settings.serverStatusCacheIsEnabled {
-            try await ServerStatusCache.find(serverId, on: req.db)?.delete(on: req.db)
-            try await ServerStatusCache(
-                id: serverId,
-                ttl: settings.serverInfoCacheTTLSeconds,
-                data: info
-            ).save(on: req.db)
+        guard let info = try await serverStatus(for: serverId, on: req.db)?.info else {
+            return try await orchestra.info(for: serverId)
         }
         return info
+    }
+    
+    func metrics(req: Request) async throws -> MCServer.Metrics {
+        guard let serverId: UUID = req.parameters.get("serverID") else {
+            throw Abort(.notFound)
+        }
+        
+        guard let metrics = try await serverStatus(for: serverId, on: req.db)?.metrics else {
+            return try await orchestra.metrics(for: serverId)
+        }
+        return metrics
     }
     
     // MARK: - Properties & config

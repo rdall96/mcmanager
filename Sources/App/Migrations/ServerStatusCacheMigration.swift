@@ -13,7 +13,8 @@ extension ServerStatusCache {
             try await database.schema(ServerStatusCache.schema)
                 .id()
                 .field(ServerStatusCache.FieldKeys.expiresAt.rawValue, .datetime, .required)
-                .field(ServerStatusCache.FieldKeys.data.rawValue, .string, .required)
+                .field(ServerStatusCache.FieldKeys.infoData.rawValue, .string, .required)
+                .field(ServerStatusCache.FieldKeys.metricsData.rawValue, .string, .required)
                 .create()
         }
         

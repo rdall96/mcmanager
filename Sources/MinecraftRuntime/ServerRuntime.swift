@@ -61,7 +61,7 @@ final actor ServerRuntime: Identifiable {
                 .init(name: Self.processName(for: id)),
                 from: Self.dockerImage(version: version)
             )
-            // Signal to update the container the next time it's run, since we didn't do a good job above
+            // Signal to update the container the next time it's run, since we didn't do a good creating all the properties above
             processNeedsUpdate = true
         }
         
@@ -318,20 +318,28 @@ final actor ServerRuntime: Identifiable {
         try await Docker.logs(for: process, tail: tail)
     }
     
-    // MARK: - Info
+    // MARK: - Status
     
     /// Info regarding the current server process
     var info: Server.Info {
         get async throws {
             if !(await isRunning) {
-                // use this a chance to update the status if the server was stopped for any reason so we don't risk reporting an active status with nil stats
+                // use this a chance to update the status if the server was stopped for any reason
                 status = .stopped
             }
-            let stats = try await Docker.stats(of: process)
             return .init(
                 status: status,
+                onlinePlayers: []
+            )
+        }
+    }
+    
+    /// Metrics for the server process
+    var metrics: Server.Metrics {
+        get async throws {
+            let stats = try await Docker.stats(of: process)
+            return .init(
                 needsRestart: processNeedsUpdate,
-                onlinePlayerCount: 0,
                 cpuPercent: stats.cpuPercent,
                 memoryUsage: stats.memoryUsageBytes
             )

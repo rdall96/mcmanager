@@ -14,7 +14,8 @@ final class ServerStatusCache: Model, Content {
     
     enum FieldKeys: FieldKey {
         case expiresAt = "expires_at"
-        case data
+        case infoData = "info"
+        case metricsData = "metrics"
     }
     
     @ID(key: .id)
@@ -24,29 +25,43 @@ final class ServerStatusCache: Model, Content {
     @Field(key: FieldKeys.expiresAt.rawValue)
     var expiresAt: Date
     
-    @Field(key: FieldKeys.data.rawValue)
-    var data: String
+    @Field(key: FieldKeys.infoData.rawValue)
+    var infoData: String
+    
+    @Field(key: FieldKeys.metricsData.rawValue)
+    var metricsData: String
     
     init() {}
     
     init(
         id: UUID,
         ttl: UInt,
-        data: MCManager_Shared.Server.Info
+        info: MCManager_Shared.Server.Info,
+        metrics: MCManager_Shared.Server.Metrics
     ) {
         self.id = id
         self.expiresAt = .now.addingTimeInterval(Double(ttl))
-        self.data = (try? JSONEncoder().encode(data).base64EncodedString()) ?? ""
+        self.infoData = (try? JSONEncoder().encode(info).base64EncodedString()) ?? ""
+        self.metricsData = (try? JSONEncoder().encode(metrics).base64EncodedString()) ?? ""
     }
     
     var isExpired: Bool {
         expiresAt < .now
     }
     
-    var serverInfo: MCManager_Shared.Server.Info? {
-        guard let data = Data(base64Encoded: self.data) else {
+    /// Cached `Server.Info` value
+    var info: MCManager_Shared.Server.Info? {
+        guard let data = Data(base64Encoded: self.infoData) else {
             return nil
         }
         return try? JSONDecoder().decode(MCManager_Shared.Server.Info.self, from: data)
+    }
+    
+    /// Cached `Server.Metrics` value
+    var metrics: MCManager_Shared.Server.Metrics? {
+        guard let data = Data(base64Encoded: self.metricsData) else {
+            return nil
+        }
+        return try? JSONDecoder().decode(MCManager_Shared.Server.Metrics.self, from: data)
     }
 }
