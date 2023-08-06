@@ -13,14 +13,18 @@ extension Server {
         public let status: Status
         /// List of currently active players on the server
         public let onlinePlayers: [String]
+        /// Maximum number of players allowed on this server
+        public let maximumPlayerCount: UInt
         
         @_spi(MCManager_Runtime)
         public init(
             status: Status,
-            onlinePlayers: [String]
+            onlinePlayers: [String],
+            maximumPlayerCount: UInt
         ) {
             self.status = status
             self.onlinePlayers = onlinePlayers
+            self.maximumPlayerCount = maximumPlayerCount
         }
     }
 }
@@ -29,5 +33,6 @@ extension Server.Info: Codable {
     private enum CodingKeys: String, CodingKey {
         case status
         case onlinePlayers = "online_players"
+        case maximumPlayerCount = "maximum_player_count"
     }
 }

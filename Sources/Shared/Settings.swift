@@ -13,19 +13,19 @@ final public class Settings: Model {
     
     @_spi(MCManager_Server)
     public enum FieldKeys: FieldKey {
-        case serverInfoCacheTTLSeconds = "server_info_cache_ttl_seconds"
+        case serverStatusCacheTTLSeconds = "server_status_cache_ttl_seconds"
         case allowedServerPorts = "allowed_server_ports"
     }
     
     @ID(key: .id)
     public var id: UUID?
     
-    @Field(key: FieldKeys.serverInfoCacheTTLSeconds.rawValue)
-    /// Time to live for the server info.
+    @Field(key: FieldKeys.serverStatusCacheTTLSeconds.rawValue)
+    /// Time to live for the server status.
     /// A higher value means requests will respond faster since they will be reading from cache, but the information could possibly be outdated.
     /// Important actions on servers, such as start/stop/restart, will automatically invalidate the cache.
     /// Set this to 0 to disable caching all together.
-    public var serverInfoCacheTTLSeconds: UInt
+    public var serverStatusCacheTTLSeconds: UInt
     
     @Field(key: FieldKeys.allowedServerPorts.rawValue)
     /// Ports allowed for server creation.
@@ -37,11 +37,11 @@ final public class Settings: Model {
     public init() {}
     
     public convenience init(
-        serverInfoCacheTTLSeconds: UInt,
+        serverStatusCacheTTLSeconds: UInt,
         allowedServerPorts: String
     ) {
         self.init()
-        self.serverInfoCacheTTLSeconds = serverInfoCacheTTLSeconds
+        self.serverStatusCacheTTLSeconds = serverStatusCacheTTLSeconds
         self.allowedServerPorts = allowedServerPorts.replacingOccurrences(of: " ", with: "")
     }
     
@@ -67,7 +67,7 @@ final public class Settings: Model {
 
 extension Settings: Codable {
     private enum CodingKeys: String, CodingKey {
-        case serverInfoCacheTTLSeconds = "server_info_cache_ttl_seconds"
+        case serverStatusCacheTTLSeconds = "server_status_cache_ttl_seconds"
         case allowedServerPorts = "allowed_server_ports"
     }
     
@@ -75,7 +75,7 @@ extension Settings: Codable {
     public convenience init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.init(
-            serverInfoCacheTTLSeconds: try container.decode(UInt.self, forKey: .serverInfoCacheTTLSeconds),
+            serverStatusCacheTTLSeconds: try container.decode(UInt.self, forKey: .serverStatusCacheTTLSeconds),
             allowedServerPorts: try container.decode(String.self, forKey: .allowedServerPorts)
         )
     }
@@ -83,7 +83,7 @@ extension Settings: Codable {
     // override encoding to ignore the settings id
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(serverInfoCacheTTLSeconds, forKey: .serverInfoCacheTTLSeconds)
+        try container.encode(serverStatusCacheTTLSeconds, forKey: .serverStatusCacheTTLSeconds)
         try container.encode(allowedServerPorts, forKey: .allowedServerPorts)
     }
 }

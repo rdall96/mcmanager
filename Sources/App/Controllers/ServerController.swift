@@ -162,7 +162,7 @@ struct ServerController: RouteCollection {
             // create a new cache
             let status = ServerStatusCache(
                 id: serverId,
-                ttl: settings.serverInfoCacheTTLSeconds,
+                ttl: settings.serverStatusCacheTTLSeconds,
                 info: try await orchestra.info(for: serverId),
                 metrics: try await orchestra.metrics(for: serverId)
             )

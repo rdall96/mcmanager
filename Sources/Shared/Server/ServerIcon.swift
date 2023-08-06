@@ -11,12 +11,18 @@ extension Server {
     public struct Icon {
         public let base64: String?
         
-        init(base64: String?) {
+        public init(base64: String?) {
             self.base64 = base64
         }
         
-        public init(_ data: String) {
-            self.init(base64: data)
+        @_spi(MCManager_Runtime)
+        public init?(atPath url: URL) {
+            guard FileManager.default.fileExists(atPath: url.path),
+                  let contents = try? Data(contentsOf: url)
+            else {
+                return nil
+            }
+            self.base64 = contents.base64EncodedString()
         }
     }
 }

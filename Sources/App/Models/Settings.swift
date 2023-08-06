@@ -14,11 +14,11 @@ extension Settings: Content {}
 extension Settings {
     static var defaults: Settings {
         .init(
-            serverInfoCacheTTLSeconds: 5,
+            serverStatusCacheTTLSeconds: 5,
             allowedServerPorts: "\(Settings.validPortRange.lowerBound)-\(Settings.validPortRange.upperBound)"
         )
     }
     
     /// If the server status cache is enabled
-    var serverStatusCacheIsEnabled: Bool { serverInfoCacheTTLSeconds > 0 }
+    var serverStatusCacheIsEnabled: Bool { serverStatusCacheTTLSeconds > 0 }
 }

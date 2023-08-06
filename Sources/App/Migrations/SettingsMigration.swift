@@ -13,7 +13,7 @@ extension Settings {
         func prepare(on database: Database) async throws {
             try await database.schema(Settings.schema)
                 .id()
-                .field(Settings.FieldKeys.serverInfoCacheTTLSeconds.rawValue, .uint, .required)
+                .field(Settings.FieldKeys.serverStatusCacheTTLSeconds.rawValue, .uint, .required)
                 .field(Settings.FieldKeys.allowedServerPorts.rawValue, .string, .required)
                 .create()
         }

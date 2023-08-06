@@ -96,7 +96,7 @@ final class RuntimeTests: XCTestCase {
         let server = TestData.createServer()
         let runtime = try await createRuntime(with: server)
         do {
-            try await runtime.updateIcon(.init("definitely_not_base64"))
+            try await runtime.updateIcon(.init(base64: "definitely_not_base64"))
             XCTFail("Expected failure when updating icon with invalid data")
         }
         catch MCRError.invalidIconData {}
@@ -184,9 +184,16 @@ final class RuntimeTests: XCTestCase {
         let runtime = try await createRuntime(with: TestData.createServer())
         let info = try await runtime.info
         XCTAssertEqual(info.status, .stopped)
-        XCTAssertEqual(info.onlinePlayerCount, 0)
-        XCTAssertEqual(info.cpuPercent, 0)
-        XCTAssertEqual(info.memoryUsageBytes, 0)
+        XCTAssertEqual(info.onlinePlayers, [])
+        XCTAssertEqual(info.maximumPlayerCount, 0)
+    }
+    
+    func testRuntimeMetrics() async throws {
+        let runtime = try await createRuntime(with: TestData.createServer())
+        let metrics = try await runtime.metrics
+        XCTAssertEqual(metrics.needsRestart, true)
+        XCTAssertEqual(metrics.cpuPercent, 0)
+        XCTAssertEqual(metrics.memoryUsageBytes, 0)
     }
     
     func testRuntimeInfoStopped() async throws {

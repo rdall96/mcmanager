@@ -132,12 +132,7 @@ final actor ServerRuntime: Identifiable {
     
     /// Read the serve ricon (if it exists) and return the base64 encoded data
     var icon: Server.Icon {
-        guard FileManager.default.fileExists(atPath: iconPath.path),
-              let contents = try? Data(contentsOf: iconPath)
-        else {
-            return .none
-        }
-        return .init(contents.base64EncodedString())
+        .init(atPath: iconPath) ?? .none
     }
     
     /// Update the server icon with the given base64 encoded icon data
@@ -327,9 +322,13 @@ final actor ServerRuntime: Identifiable {
                 // use this a chance to update the status if the server was stopped for any reason
                 status = .stopped
             }
+            // Query the server for the player count
+            let players: [String] = []
+            let maxPlayers: UInt = 0
             return .init(
                 status: status,
-                onlinePlayers: []
+                onlinePlayers: players,
+                maximumPlayerCount: maxPlayers
             )
         }
     }
