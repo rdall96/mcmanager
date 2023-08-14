@@ -26,6 +26,9 @@ public func configure(_ app: Application) async throws {
     // Security
     try await setupKeys(app)
     
+    // Add CORS
+    addCorsMiddleware(to: app)
+    
     // Register routes
     try await routes(app)
 }
@@ -83,5 +86,26 @@ fileprivate func firstTimeSetup(_ app: Application) async throws {
     // Write default settings
     if try await Settings.query(on: app.db).all().isEmpty {
         try await Settings.defaults.save(on: app.db)
+    }
+}
+
+fileprivate func addCorsMiddleware(to app: Application) {
+    let corsConfiguration = CORSMiddleware.Configuration(
+        allowedOrigin: .defaultFrontend,
+        allowedMethods: [.GET, .POST, .PUT, .DELETE],
+        allowedHeaders: [.accept, .authorization, .contentType, .origin, .xRequestedWith, .userAgent, .accessControlAllowOrigin],
+        allowCredentials: true
+    )
+    let cors = CORSMiddleware(configuration: corsConfiguration)
+    // cors middleware should come before default error middleware using `at: .beginning`
+    app.middleware.use(cors, at: .beginning)
+}
+
+extension CORSMiddleware.AllowOriginSetting {
+    static var defaultFrontend: Self {
+        .any([
+            "127.0.0.1",
+            "http://localhost:3000"
+        ])
     }
 }
