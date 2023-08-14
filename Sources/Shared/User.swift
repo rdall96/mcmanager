@@ -5,6 +5,7 @@
 //  Created by Ricky Dall'Armellina on 7/14/23.
 //
 
+import Foundation
 import Fluent
 
 public final class User: Model {

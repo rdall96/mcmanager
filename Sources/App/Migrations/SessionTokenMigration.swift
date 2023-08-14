@@ -13,10 +13,9 @@ extension SessionToken {
             try await database.schema(SessionToken.schema)
                 .id()
                 .field(SessionToken.FieldKeys.subject.rawValue, .string, .required)
-                .field(SessionToken.FieldKeys.userId.rawValue, .uuid, .references("users", "id"))
-                .field(SessionToken.FieldKeys.admin.rawValue, .bool, .required)
                 .field(SessionToken.FieldKeys.issuedAt.rawValue, .datetime, .required)
                 .field(SessionToken.FieldKeys.expiresAt.rawValue, .datetime, .required)
+                .field(SessionToken.FieldKeys.userId.rawValue, .uuid, .references("users", "id"))
                 .create()
         }
         

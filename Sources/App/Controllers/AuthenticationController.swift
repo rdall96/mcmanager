@@ -25,7 +25,7 @@ struct AuthenticationController: RouteCollection {
     /// Login request
     func login(req: Request) async throws -> ClientSession {
         let user = try req.auth.require(User.self)
-        guard let payload = SessionToken.token(for: user) else {
+        guard let payload = try SessionToken.token(for: user) else {
             throw Abort(.unauthorized)
         }
         try await payload.save(on: req.db)

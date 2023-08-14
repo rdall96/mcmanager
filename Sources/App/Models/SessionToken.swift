@@ -15,10 +15,9 @@ final class SessionToken: Model, Content {
 
     enum FieldKeys: FieldKey {
         case subject
-        case userId = "user_id"
-        case admin
         case issuedAt
         case expiresAt
+        case userId = "user_id"
     }
     
     @ID(key: .id)
@@ -27,49 +26,44 @@ final class SessionToken: Model, Content {
     @Field(key: FieldKeys.subject.rawValue)
     var sub: SubjectClaim
     
-    @Parent(key: FieldKeys.userId.rawValue)
-    var user: User
-    
-    @Field(key: FieldKeys.admin.rawValue)
-    var admin: Bool
-    
     @Field(key: FieldKeys.issuedAt.rawValue)
     var iat: IssuedAtClaim
     
     @Field(key: FieldKeys.expiresAt.rawValue)
     var exp: ExpirationClaim
     
+    @Parent(key: FieldKeys.userId.rawValue)
+    var user: User
+    private var userStorage: User?
+    
     init() {}
     
     init(
         id: UUID = UUID(),
         sub: SubjectClaim,
-        userId: UUID,
-        admin: Bool,
         iat: IssuedAtClaim,
-        exp: ExpirationClaim
-    ) {
+        exp: ExpirationClaim,
+        user: User
+    ) throws {
         self.id = id
         self.sub = sub
-        self.$user.id = userId
-        self.admin = admin
         self.iat = iat
         self.exp = exp
+        self.$user.id = try user.requireID()
+        self.userStorage = user
     }
 }
 
 extension SessionToken {
     /// Create a new token for the given user
-    static func token(for user: User) -> SessionToken? {
-        guard let userId = user.id else { return nil }
+    static func token(for user: User, database: Database? = nil) throws -> SessionToken? {
         let currentDate: Date = .now
         let expirationDate = Self.accessExpiration(for: currentDate)
-        return .init(
+        return try .init(
             sub: .init(value: "mcmanager"),
-            userId: userId,
-            admin: user.isAdmin,
             iat: .init(value: currentDate),
-            exp: .init(value: expirationDate)
+            exp: .init(value: expirationDate),
+            user: user
         )
     }
 }
@@ -124,5 +118,25 @@ extension SessionToken {
             let user = try await storedJwt.$user.get(on: request.db)
             request.auth.login(user)
         }
+    }
+}
+
+ // MARK: - Codable
+extension SessionToken: Encodable {
+    private enum Keys: String, CodingKey {
+        case id
+        case sub
+        case user
+        case iat
+        case exp
+    }
+    
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: Keys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(sub, forKey: .sub)
+        try container.encode(userStorage, forKey: .user)
+        try container.encode(iat, forKey: .iat)
+        try container.encode(exp, forKey: .exp)
     }
 }

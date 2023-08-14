@@ -1,4 +1,4 @@
-@testable import App
+@testable import MCManager
 import XCTVapor
 
 final class AppTests: XCTestCase {
