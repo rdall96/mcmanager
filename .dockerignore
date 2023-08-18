@@ -3,3 +3,5 @@
 .swiftpm/
 .gitignore
 .gitlab-ci.yml
+*.md
+

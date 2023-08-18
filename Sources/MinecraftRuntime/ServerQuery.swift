@@ -6,7 +6,11 @@
 //
 
 import Foundation
+
+// Network is only available on Apple platforms
+#if canImport(Network)
 import Network
+#endif // canImport(Network)
 
 final actor ServerQuery {
     
@@ -125,22 +129,35 @@ extension ServerRequest {
 
 // MARK: - UDP Session
 fileprivate final actor UDPSession {
+    
+#if canImport(Network)
     private let connection: NWConnection
+#endif // canImport(Network)
+    
     let timeout: Int
     
     init(host: Address, port: UInt16, timeout: Int = 30) {
+#if canImport(Network)
         connection = NWConnection(
             host: .init(host.rawValue),
             port: .init(integerLiteral: port),
             using: .udp
         )
+#endif // canImport(Network)
         self.timeout = timeout
     }
     
-    var isConnected: Bool { connection.state == .ready }
+    var isConnected: Bool {
+#if canImport(Network)
+        connection.state == .ready
+#else
+        false // never connected for unsupported platforms
+#endif // canImport(Network)
+    }
     
     /// Create a connection to the host
     func connect() async throws {
+#if canImport(Network)
         try await withUnsafeThrowingContinuation { (continuation: UnsafeContinuation<Void, Error>) in
             let sem = DispatchSemaphore(value: 0)
             connection.stateUpdateHandler = { (newState) in
@@ -165,10 +182,15 @@ fileprivate final actor UDPSession {
                 return
             }
         }
+#else
+        // return immediately on unsupported platforms
+        return
+#endif // canImport(Network)
     }
     
     /// Send data through the connection
     func send(_ data: Data) async throws {
+#if canImport(Network)
         try await withUnsafeThrowingContinuation { (continuation: UnsafeContinuation<Void, Error>) in
             let sem = DispatchSemaphore(value: 0)
             let completion: NWConnection.SendCompletion = .contentProcessed { error in
@@ -187,10 +209,15 @@ fileprivate final actor UDPSession {
                 return
             }
         }
+#else
+        // return immediately on unsupported platforms
+        return
+#endif // canImport(Network)
     }
     
     /// Receive data on the connection
     func receive() async throws -> Data {
+#if canImport(Network)
         try await withUnsafeThrowingContinuation { continuation in
             let sem = DispatchSemaphore(value: 0)
             connection.receiveMessage { (data, context, isComplete, error) in
@@ -213,6 +240,10 @@ fileprivate final actor UDPSession {
                 return
             }
         }
+#else
+        // return empty data on unsupported platforms
+        return Data()
+#endif // canImport(Network)
     }
 }
 
