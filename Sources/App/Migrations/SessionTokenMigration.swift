@@ -16,6 +16,7 @@ extension SessionToken {
                 .field(SessionToken.FieldKeys.issuedAt.rawValue, .datetime, .required)
                 .field(SessionToken.FieldKeys.expiresAt.rawValue, .datetime, .required)
                 .field(SessionToken.FieldKeys.userId.rawValue, .uuid, .references("users", "id"))
+                .ignoreExisting()
                 .create()
         }
         

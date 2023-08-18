@@ -15,6 +15,7 @@ extension Settings {
                 .id()
                 .field(Settings.FieldKeys.serverStatusCacheTTLSeconds.rawValue, .uint, .required)
                 .field(Settings.FieldKeys.allowedServerPorts.rawValue, .string, .required)
+                .ignoreExisting()
                 .create()
         }
         

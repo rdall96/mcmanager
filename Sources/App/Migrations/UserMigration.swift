@@ -19,6 +19,7 @@ extension User {
                 .field(User.FieldKeys.createdAt.rawValue, .datetime, .required)
                 .field(User.FieldKeys.updatedAt.rawValue, .datetime, .required)
                 .field(User.FieldKeys.isAdmin.rawValue, .bool, .required)
+                .ignoreExisting()
                 .create()
         }
         

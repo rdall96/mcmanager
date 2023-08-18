@@ -19,6 +19,7 @@ extension Server {
                 .field(Server.FieldKeys.port.rawValue, .uint32, .required)
                 .field(Server.FieldKeys.createdAt.rawValue, .datetime, .required)
                 .field(Server.FieldKeys.updatedAt.rawValue, .datetime, .required)
+                .ignoreExisting()
                 .create()
         }
         
