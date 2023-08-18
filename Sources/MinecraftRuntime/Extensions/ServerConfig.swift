@@ -6,142 +6,59 @@
 //
 
 import Foundation
-import MCManager_Shared
+import DockerSwiftAPI
+@_spi(MinecraftRuntime) import MCManager_Shared
 
 extension Server.Config {
     
-    private static var defaultJson: String {
-        """
+    static var defaults: Set<Self> {
         [
-        {
-        "id": "ALLOW_FLIGHT",
-        "value": false
-        },
-        {
-        "id": "ALLOW_NETHER",
-        "value": true
-        },
-        {
-        "id": "DIFFICULTY",
-        "value": "easy"
-        },
-        {
-        "id": "ENABLE_COMMAND_BLOCK",
-        "value": false
-        },
-        {
-        "id": "ENABLE_STATUS",
-        "value": true
-        },
-        {
-        "id": "ENFORCE_SECURE_PROFILE",
-        "value": true
-        },
-        {
-        "id": "GAMEMODE",
-        "value": "survival"
-        },
-        {
-        "id": "GENERATE_STRUCTURES",
-        "value": true
-        },
-        {
-        "id": "HARDCORE",
-        "value": false
-        },
-        {
-        "id": "HIDE_ONLINE_PLAYERS",
-        "value": false
-        },
-        {
-        "id": "LEVEL_SEED",
-        "value": ""
-        },
-        {
-        "id": "LEVEL_TYPE",
-        "value": "minecraft:normal"
-        },
-        {
-        "id": "MAX_PLAYERS",
-        "value": 10
-        },
-        {
-        "id": "MOTD",
-        "value": "Hosted with MCManager"
-        },
-        {
-        "id": "ONLINE_MODE",
-        "value": true
-        },
-        {
-        "id": "PLAYER_IDLE_TIMEOUT",
-        "value": 0
-        },
-        {
-        "id": "PVP",
-        "value": true
-        },
-        {
-        "id": "RESOURCE_PACK",
-        "value": ""
-        },
-        {
-        "id": "RESOURCE_PACK_PROMPT",
-        "value": ""
-        },
-        {
-        "id": "REQUIRE_RESOURCE_PACK",
-        "value": false
-        },
-        {
-        "id": "SIMULATION_DISTANCE",
-        "value": 10
-        },
-        {
-        "id": "SPAWN_ANIMALS",
-        "value": true
-        },
-        {
-        "id": "SPAWN_MONSTERS",
-        "value": true
-        },
-        {
-        "id": "SPAWN_NPCS",
-        "value": true
-        },
-        {
-        "id": "SPAWN_PROTECTION",
-        "value": 16
-        },
-        {
-        "id": "VIEW_DISTANCE",
-        "value": 10
-        },
-        {
-        "id": "WHITE_LIST",
-        "value": false
-        }
+            .init("ALLOW_FLIGHT", value: .flag(false)),
+            .init("ALLOW_NETHER", value: .flag(true)),
+            .init("DIFFICULTY", value: .text("easy")),
+            .init("ENABLE_COMMAND_BLOCK", value: .flag(false)),
+            .init("ENABLE_STATUS", value: .flag(true)),
+            .init("ENFORCE_SECURE_PROFILE", value: .flag(true)),
+            .init("GAMEMODE", value: .text("survival")),
+            .init("GENERATE_STRUCTURES", value: .flag(true)),
+            .init("HARDCORE", value: .flag(false)),
+            .init("HIDE_ONLINE_PLAYERS", value: .flag(false)),
+            .init("LEVEL_SEED", value: .text("")),
+            .init("LEVEL_TYPE", value: .text("minecraft:normal")),
+            .init("MAX_PLAYERS", value: .number(10)),
+            .init("MOTD", value: .text("Hosted with MCManager")),
+            .init("ONLINE_MODE", value: .flag(true)),
+            .init("PLAYER_IDLE_TIMEOUT", value: .number(0)),
+            .init("PVP", value: .flag(true)),
+            .init("RESOURCE_PACK", value: .text("")),
+            .init("RESOURCE_PACK_PROMPT", value: .text("")),
+            .init("REQUIRE_RESOURCE_PACK", value: .flag(false)),
+            .init("SIMULATION_DISTANCE", value: .number(10)),
+            .init("SPAWN_ANIMALS", value: .flag(true)),
+            .init("SPAWN_MONSTERS", value: .flag(true)),
+            .init("SPAWN_NPCS", value: .flag(true)),
+            .init("SPAWN_PROTECTION", value: .number(16)),
+            .init("VIEW_DISTANCE", value: .number(10)),
+            .init("WHITE_LIST", value: .flag(false)),
         ]
-        """
     }
     
-    static var defaultData: Data { defaultJson.data(using: .utf8)! }
-    
     /// An environmetn varaible representation of the current property as key=value
-    var environmentVariable: String {
-        "\(id)=\(value.description)"
+    var environmentVariable: Docker.ContainerSpec.EnvironmentVariable {
+        .init(key: id, value: value.description)
     }
     
     /// Read the server config at the given file path. If the config file can't be found, you can specify to create one using the default values
     static func read(at path: URL, createDefault: Bool = false) throws -> Set<Server.Config> {
         // if the file doesn't exist, create it usign the defaults
         if !FileManager.default.fileExists(atPath: path.path), createDefault {
-            try Server.Config.defaultData.write(to: path)
+            try PropertyListEncoder().encode(defaults)
+                .write(to: path)
         }
         // read the file contents
         do {
             let data = try Data(contentsOf: path)
-            return try JSONDecoder().decode(Set<Server.Config>.self, from: data)
+            return try PropertyListDecoder().decode(Set<Server.Config>.self, from: data)
         }
         catch {
             throw MCRError.corruptedServerConfiguration(path, error)

@@ -14,7 +14,8 @@ extension Server {
         public var value: Value
         
         @_spi(MCManager_Tests)
-        public init(id: String, value: Value) {
+        @_spi(MinecraftRuntime)
+        public init(_ id: String, value: Value) {
             self.id = id
             self.value = value
         }

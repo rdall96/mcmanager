@@ -130,7 +130,7 @@ final class RuntimeTests: XCTestCase {
             config.first(where: { $0.id == "PVP" })?.value.description == "true"
         )
         try await runtime.updateConfig(
-            [.init(id: "PVP", value: .flag(false))]
+            [.init("PVP", value: .flag(false))]
         )
         config = await runtime.config
         XCTAssert(
@@ -142,7 +142,7 @@ final class RuntimeTests: XCTestCase {
         let runtime = try await createRuntime(with: TestData.createServer())
         do {
             try await runtime.updateConfig(
-                [.init(id: "INVICIBLE", value: .flag(true))]
+                [.init("INVICIBLE", value: .flag(true))]
             )
             XCTFail("Expected failure when updating server config with unknwown key")
         }
