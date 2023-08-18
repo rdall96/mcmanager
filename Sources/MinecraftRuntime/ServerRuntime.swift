@@ -59,7 +59,8 @@ final actor ServerRuntime: Identifiable {
             // this will automatically pull the image as well
             self.process = try await Docker.create(
                 .init(name: Self.processName(for: id)),
-                from: Self.dockerImage(version: version)
+                from: Self.dockerImage(version: version),
+                pull: true // pull the image so we have the latest one ready
             )
             // Signal to update the container the next time it's run, since we didn't do a good creating all the properties above
             processNeedsUpdate = true

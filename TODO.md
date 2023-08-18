@@ -3,7 +3,6 @@
 ## MVP
 - All the work for server queries was useless - the `Network` library doesn't work on linux yet :-(
 - Monitor server start process to properly set the `running` status
-- Fix bug with server logs not being complete
 - Auth token singing with private key
 
 ## Ideas
