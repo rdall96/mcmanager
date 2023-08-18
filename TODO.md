@@ -1,7 +1,8 @@
 # TODO
 
 ## MVP
-- Server query to get list of players
+- Monitor server start process to properly set the `running` status
+- Fix bug with server logs not being complete
 - Auth token singing with private key
 
 ## Ideas

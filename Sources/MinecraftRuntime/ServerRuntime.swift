@@ -186,7 +186,10 @@ final actor ServerRuntime: Identifiable {
     private var dockerConfig: Docker.ContainerSpec {
         // enviroment variables
         var environment = config.map { $0.environmentVariable }
-        environment.append("EULA=true")
+        environment.append(contentsOf: [
+            "EULA=true", // accept the EULA for the server to start
+            "ENABLE_QUERY=true", // Enable query to allow MCManager to perform queries on the server stats
+        ])
         
         // volumes
         var volumes = [String : String]()
@@ -322,13 +325,33 @@ final actor ServerRuntime: Identifiable {
                 // use this a chance to update the status if the server was stopped for any reason
                 status = .stopped
             }
-            // Query the server for the player count
-            let players: [String] = []
-            let maxPlayers: UInt = 0
+            
+            // Query the server for the player count if the server is running
+            var playerList = [String]()
+            if status == .running {
+                // add a fairly quick timeout to the server query as we don't want to block for too long if the server isn't responding
+                let query = ServerQuery(port: self.port, timeout: 5)
+                do {
+                    playerList = try await query.getPlayers()
+                }
+                catch {
+                    // TODO: Log an error here that the getPlayers() call failed, but don't surface it
+                }
+            }
+            
+            // the max player count is stored in the server config
+            let maxPlayerCount: UInt
+            switch config.first(where: { $0.id == "MAX_PLAYERS" })?.value {
+            case .number(let int):
+                maxPlayerCount = UInt(int)
+            default:
+                maxPlayerCount = 0
+            }
+            
             return .init(
                 status: status,
-                onlinePlayers: players,
-                maximumPlayerCount: maxPlayers
+                onlinePlayers: playerList,
+                maximumPlayerCount: maxPlayerCount
             )
         }
     }
