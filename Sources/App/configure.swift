@@ -104,7 +104,7 @@ fileprivate func addCorsMiddleware(to app: Application) {
 extension CORSMiddleware.AllowOriginSetting {
     static var defaultFrontend: Self {
         .any([
-            "127.0.0.1",
+            "127.0.0.1:3000",
             "http://localhost:3000"
         ])
     }
