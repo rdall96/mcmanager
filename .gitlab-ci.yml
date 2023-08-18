@@ -47,7 +47,7 @@ dev-build:
     # and if we have changes in relevant files when pushing a new commit
     - changes:
         - Dockerfile
-        - Sources/*
+        - Sources/**/*
         - Package.*
       when: always
 
