@@ -32,8 +32,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://gitlab.com/rdall96/docker-swift-api",
       "state" : {
-        "revision" : "8923725b3744473db9ffaf83babfc08827c5c276",
-        "version" : "1.0.1"
+        "revision" : "717705d4d31991b8e39c9fd28e983acfcddc1a23",
+        "version" : "1.2.0"
       }
     },
     {

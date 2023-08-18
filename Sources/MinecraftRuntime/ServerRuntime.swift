@@ -185,20 +185,27 @@ final actor ServerRuntime: Identifiable {
     /// Configuration for the Docker client with the parameters necessary to run the container
     private var dockerConfig: Docker.ContainerSpec {
         // enviroment variables
-        var environment = config.map { $0.environmentVariable }
+        var environment: [Docker.ContainerSpec.EnvironmentVariable] = config.map { $0.environmentVariable }
         environment.append(contentsOf: [
-            "EULA=true", // accept the EULA for the server to start
-            "ENABLE_QUERY=true", // Enable query to allow MCManager to perform queries on the server stats
+            .init(key: "EULA", value: "true"), // accept the EULA for the server to start
+            .init(key: "ENABLE_QUERY", value: "true"), // Enable query to allow MCManager to perform queries on the server stats
         ])
         
+        // ports
+        let ports: [Docker.ContainerSpec.PortMapping] = [
+            // map both TCP and UDP to the container ports. TCP: game, UDP: queries
+            .init(hostPort: UInt(self.port), containerPort: UInt(Self.minecraftServerPort), protocol: .tcp),
+            .init(hostPort: UInt(self.port), containerPort: UInt(Self.minecraftServerPort), protocol: .udp),
+        ]
+        
         // volumes
-        var volumes = [String : String]()
+        var volumes = [Docker.ContainerSpec.VolumeMapping]()
         for containerPath in Self.dockerVolumePaths {
             let pathComponents = containerPath.split(separator: "/", maxSplits: 1)
                 .compactMap { String($0) }
             guard pathComponents.count == 2 else { continue }
             let hostPath = path.appendingPathComponent(pathComponents[1], isDirectory: true)
-            volumes[hostPath.path] = containerPath
+            volumes.append(.init(hostPath: hostPath.path, containerPath: containerPath))
         }
 
         // container name
@@ -209,7 +216,7 @@ final actor ServerRuntime: Identifiable {
             hostname: name,
             interactive: true, // we need this in order to send commands to the server process later
             name: name,
-            ports: [UInt(port):UInt(Self.minecraftServerPort)],
+            ports: ports,
             restartPolicy: .unlessStopped,
             volumes: volumes
         )
@@ -224,7 +231,8 @@ final actor ServerRuntime: Identifiable {
             // create a new container using the current server runtime specs
             self.process = try await Docker.create(
                 dockerConfig,
-                from: Self.dockerImage(version: version)
+                from: Self.dockerImage(version: version),
+                pull: true // always pull the image to make sure we have the most up-to-date version
             )
             processNeedsUpdate = false
         }
