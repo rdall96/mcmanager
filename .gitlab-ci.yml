@@ -4,16 +4,17 @@ stages:
 
 
 variables:
-  # Name of the public image
-  IMAGE_NAME: "rdall96/mcmanager"
   # Commit tags regex to determine what pipeline to run
   DEV_TAG: '/^dev-\d.\d.\d$/'
   RELEASE_TAG: '/^\d.\d.\d$/'
   # Name of the tag when doing manual builds
-  CUSTOM_TAG: ""
+  CUSTOM_TAG: ''
   # Use TLS https://docs.gitlab.com/ee/ci/docker/using_docker_build.html#tls-enabled
   DOCKER_HOST: tcp://docker:2376
   DOCKER_TLS_CERTDIR: "/certs"
+  # Image names
+  PRIVATE_IMAGE: '$CI_REGISTRY/mcmanager/mcmanager'
+  PUBLIC_IMAGE: '$DOCKERHUB_USER/mcmanager'
 
 
 default:
@@ -31,10 +32,10 @@ dev-build:
   script:
     # Build the image and upload to to the private registry
     - |
-      docker build -t $CI_REGISTRY/$IMAGE_NAME:$CI_COMMIT_SHORT_SHA . \
+      docker build -t $PRIVATE_IMAGE:dev-$CI_COMMIT_SHORT_SHA . \
       --build-arg C_OPTIMIZATION="-Og" \
       --build-arg BUILD_TYPE="debug"
-    - docker push $CI_REGISTRY/$IMAGE_NAME:dev-$CI_COMMIT_SHORT_SHA
+    - docker push $PRIVATE_IMAGE:dev-$CI_COMMIT_SHORT_SHA
   rules:
     # only run this job when a new commit is created and we don't have a tag
     - if: $CI_COMMIT_TAG =~ $RELEASE_TAG
@@ -57,8 +58,8 @@ release-build:
   stage: build
   script:
     # Build and upload to private registry
-    - docker build -t $CI_REGISTRY/$IMAGE_NAME:$CI_COMMIT_TAG .
-    - docker push $CI_REGISTRY/$IMAGE_NAME:$CI_COMMIT_TAG
+    - docker build -t $PRIVATE_IMAGE:$CI_COMMIT_TAG .
+    - docker push $PRIVATE_IMAGE:$CI_COMMIT_TAG
   rules:
     - if: $CI_COMMIT_TAG =~ $RELEASE_TAG
 
@@ -68,13 +69,14 @@ release-dockerhub:
   stage: release
   script:
     # Download the newly built image
-    - docker pull $CI_REGISTRY/$IMAGE_NAME:$CI_COMMIT_TAG
+    - docker pull $PRIVATE_IMAGE:$CI_COMMIT_TAG
     # Login into dockerhub
     - docker login -u $DOCKERHUB_USER -p $DOCKERHUB_TOKEN
     # Tag the image as latest and push
-    - docker tag $CI_REGISTRY/$IMAGE_NAME:$CI_COMMIT_TAG $CI_REGISTRY/$IMAGE_NAME:latest
-    - docker push $IMAGE_NAME:$CI_COMMIT_TAG
-    - docker push $IMAGE_NAME:latest
+    - docker tag $PRIVATE_IMAGE:$CI_COMMIT_TAG $PUBLIC_IMAGE:$CI_COMMIT_TAG
+    - docker tag $PUBLIC_IMAGE:$CI_COMMIT_TAG $PUBLIC_IMAGE:latest
+    - docker push $PUBLIC_IMAGE:$CI_COMMIT_TAG
+    - docker push $PUBLIC_IMAGE:latest
   rules:
     - if: $CI_COMMIT_TAG =~ $RELEASE_TAG
       when: on_success
@@ -106,7 +108,7 @@ manual-build:
   stage: build
   script:
     # Build and push to the private registry
-    - docker build -t $CI_REGISTRY/$IMAGE_NAME:$CUSTOM_TAG .
-    - docker push $CI_REGISTRY/$IMAGE_NAME:$CUSTOM_TAG
+    - docker build -t $PRIVATE_IMAGE:$CUSTOM_TAG .
+    - docker push $PRIVATE_IMAGE:$CUSTOM_TAG
   rules:
     - if: $CUSTOM_TAG != null && $CUSTOM_TAG != ""
