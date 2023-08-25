@@ -100,8 +100,8 @@ public final class ServerOrchestra {
     public var allSupportedRuntimes: [Server.RuntimeSupport] {
         get async throws {
             let allTags = try await DockerHub.tags(
-                for: ServerRuntime.dockerHubRepositoryName,
-                in: ServerRuntime.dockerHubNamespace
+                for: ServerRuntime.Defaults.dockerHubRepositoryName,
+                in: ServerRuntime.Defaults.dockerHubNamespace
             ).compactMap { $0.name }
             return Server.ServerType.allCases.compactMap {
                 .init(type: $0, versions: Server.RuntimeSupport.tags(for: $0, from: allTags))

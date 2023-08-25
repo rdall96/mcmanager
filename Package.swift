@@ -4,7 +4,7 @@ import PackageDescription
 let package = Package(
     name: "MCManager",
     platforms: [
-        .macOS(.v12)
+        .macOS(.v13)
     ],
     dependencies: [
         // Web framework: Vapor
@@ -15,7 +15,7 @@ let package = Package(
         // JWT for authentication
         .package(url: "https://github.com/vapor/jwt.git", from: "4.2.2"),
         // Docker api
-        .package(url: "https://gitlab.com/rdall96/docker-swift-api", from: "1.2.0"),
+        .package(url: "https://gitlab.com/rdall96/docker-swift-api", from: "1.3.0"),
         // Swift commands
         .package(url: "https://github.com/qiuzhifei/swift-commands", from: "0.6.0"),
     ],

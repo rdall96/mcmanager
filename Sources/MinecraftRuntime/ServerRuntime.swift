@@ -8,6 +8,7 @@
 import Foundation
 @_spi(MCManager_Runtime) import MCManager_Shared
 import DockerSwiftAPI
+import RegexBuilder
 
 final actor ServerRuntime: Identifiable {
     typealias Command = String
@@ -47,19 +48,19 @@ final actor ServerRuntime: Identifiable {
         
         // Read configuration
         config = try Server.Config.read(
-            at: path.appendingPathComponent(Self.configFileName),
+            at: path.appendingPathComponent(Defaults.configFileName),
             createDefault: true
         )
         
         // If there is no existing process for thsi server, create one
-        if let process = await Self.process(for: Self.processName(for: id)) {
+        if let process = await Defaults.process(for: Defaults.processName(for: id)) {
             self.process = process
         }
         else {
             // this will automatically pull the image as well
             self.process = try await Docker.create(
-                .init(name: Self.processName(for: id)),
-                from: Self.dockerImage(version: version),
+                .init(name: Defaults.processName(for: id)),
+                from: Defaults.dockerImage(for: version),
                 pull: true // pull the image so we have the latest one ready
             )
             // Signal to update the container the next time it's run, since we didn't do a good creating all the properties above
@@ -75,11 +76,11 @@ final actor ServerRuntime: Identifiable {
     // MARK: - Computed Members
     
     private var configPath: URL {
-        path.appendingPathComponent(Self.configFileName)
+        path.appendingPathComponent(Defaults.configFileName)
     }
     
     private var iconPath: URL {
-        path.appendingPathComponent(Self.iconFileName)
+        path.appendingPathComponent(Defaults.iconFileName)
     }
     
     // MARK: - Methods
@@ -161,7 +162,13 @@ final actor ServerRuntime: Identifiable {
     /// Refresh the process status
     private func updateStatus() async {
         let dockerStatus = (try? await Docker.status(of: process)) ?? .unknown
-        status = Server.Status(with: dockerStatus)
+        if dockerStatus == .running {
+            let logs = (try? await Docker.logs(for: process)) ?? []
+            status = Server.Status.latestStatus(in: logs.joined(separator: "\n"))
+        }
+        else {
+            status = Server.Status(with: dockerStatus)
+        }
     }
     
     /// Check if the process is running
@@ -195,13 +202,13 @@ final actor ServerRuntime: Identifiable {
         // ports
         let ports: [Docker.ContainerSpec.PortMapping] = [
             // map both TCP and UDP to the container ports. TCP: game, UDP: queries
-            .init(hostPort: UInt(self.port), containerPort: UInt(Self.minecraftServerPort), protocol: .tcp),
-            .init(hostPort: UInt(self.port), containerPort: UInt(Self.minecraftServerPort), protocol: .udp),
+            .init(hostPort: UInt(self.port), containerPort: UInt(Defaults.minecraftServerPort), protocol: .tcp),
+            .init(hostPort: UInt(self.port), containerPort: UInt(Defaults.minecraftServerPort), protocol: .udp),
         ]
         
         // volumes
         var volumes = [Docker.ContainerSpec.VolumeMapping]()
-        for containerPath in Self.dockerVolumePaths {
+        for containerPath in Defaults.dockerVolumePaths {
             let pathComponents = containerPath.split(separator: "/", maxSplits: 1)
                 .compactMap { String($0) }
             guard pathComponents.count == 2 else { continue }
@@ -210,32 +217,44 @@ final actor ServerRuntime: Identifiable {
         }
 
         // container name
-        let name = Self.processName(for: id)
+        let name = Defaults.processName(for: id)
         
         return .init(
             environment: environment,
             hostname: name,
             interactive: true, // we need this in order to send commands to the server process later
+            labels: [
+                "mcmanager.server.id": id.uuidString,
+                "mcmanager.server.type": type.rawValue,
+                "mcmanager.server.version": version,
+            ],
             name: name,
             ports: ports,
-            restartPolicy: .unlessStopped,
+            restartPolicy: .no,
             volumes: volumes
         )
     }
     
     /// Ensure the server runtime (process) is the most up to date version by checkign the internal member processNeedsUpdate and create a new container of necessary
-    private func ensureRuntimeIsUpdated() async throws {
-        // If the process needs to be updated, create a new container
-        if processNeedsUpdate {
-            // remove the previous container
-            try await Docker.remove(container: process)
-            // create a new container using the current server runtime specs
-            self.process = try await Docker.create(
-                dockerConfig,
-                from: Self.dockerImage(version: version),
-                pull: true // always pull the image to make sure we have the most up-to-date version
-            )
-            processNeedsUpdate = false
+    private func recreateProcess() async throws {
+        try await Docker.remove(container: process)
+        self.process = try await Docker.create(
+            dockerConfig,
+            from: Defaults.dockerImage(for: version),
+            pull: true
+        )
+        processNeedsUpdate = false
+    }
+    
+    /// Monitor the server start/stop cycle to accurately report the `status`
+    private func waitForStatus(_ desiredStatus: Server.Status) async {
+        while self.status != desiredStatus {
+            let logs = (try? await logs(tail: 100)) ?? []
+            let currentStatus = Server.Status.latestStatus(in: logs.joined(separator: "\n"))
+            if currentStatus != .unknown {
+                self.status = currentStatus
+            }
+            try? await Task.sleep(seconds: 1)
         }
     }
     
@@ -244,14 +263,12 @@ final actor ServerRuntime: Identifiable {
         if await isRunning {
             throw MCRError.executionError("The server is already running")
         }
-        try await ensureRuntimeIsUpdated()
+        try await recreateProcess()
         // update status manually to notify the server is starting
         status = .starting
         do {
             try await Docker.start(process)
-            // TODO: Monitor startup so we can keep the status as `starting` as long as the server isn't ready, then sync with Docker
-            // update the status again to ensure we stay in sync with docker
-            await updateStatus()
+            Task(priority: .background) { await waitForStatus(.running) }
         }
         catch {
             status = .error
@@ -266,10 +283,7 @@ final actor ServerRuntime: Identifiable {
         status = .stopping
         do {
             try await send(command: "stop")
-            try await Docker.stop(process)
-            // TODO: Monitor shutdown so we can keep the status as `stopping` as long as the server isn't ready, then sync with Docker
-            // update the status again to ensure we stay in sync with docker
-            await updateStatus()
+            Task(priority: .background) { await waitForStatus(.stopped) }
         }
         catch {
             status = .error
@@ -307,7 +321,7 @@ final actor ServerRuntime: Identifiable {
             <minecraft_command_output>
          3. Make sure to wrap every command in (/bin/bash -c "<command>") to ensure we run in a working shell
          */
-        let pid = try await Docker.exec("/bin/bash -c \"top -n 1 | grep \(Self.serverProcessName)\"", in: process)
+        let pid = try await Docker.exec("/bin/bash -c \"top -n 1 | grep \(Defaults.serverProcessName)\"", in: process)
             .split(separator: " ")
             .first
         guard let pid else {
@@ -339,7 +353,7 @@ final actor ServerRuntime: Identifiable {
             var playerList = [String]()
             if status == .running {
                 // add a fairly quick timeout to the server query as we don't want to block for too long if the server isn't responding
-                let query = ServerQuery(port: self.port, timeout: 5)
+                let query = ServerQuery(port: self.port, timeout: 1)
                 do {
                     playerList = try await query.getPlayers()
                 }
@@ -380,56 +394,55 @@ final actor ServerRuntime: Identifiable {
 
 // MARK: - Defaults
 extension ServerRuntime {
-    
-    /// Name for a server process
-    static func processName(for serverId: UUID) -> String {
-        return "mcmanager_server-\(serverId.pathSafeString)"
-    }
-    
-    /// Name of the server config file on disk
-    static var configFileName: String { "config.json" }
-    
-    /// Name of the server icon on disk
-    static var iconFileName: String { "icon.png" }
-    
-    /// Name of the server mods directory on disk
-    static var modsDirectoryName: String { "mods" }
-    
-    /// Docker container process for the given server name
-    static func process(for name: String) async -> Docker.Container? {
-        try? await Docker.containers.first {
-            $0.name == name
+    enum Defaults {
+        
+        /// Name for a server process
+        static func processName(for serverId: UUID) -> String {
+            return "mcmanager_server-\(serverId.pathSafeString)"
         }
-    }
-    
-    /// Name of the Minecraft server image namespace in DockerHub
-    static var dockerHubNamespace: DockerHub.Namespace { "rdall96" }
-    
-    /// Name of the Minecraft server image repository in DockerHub
-    static var dockerHubRepositoryName: DockerHub.Repository.Name { "minecraft-server" }
-    
-    /// Name of the server docker image
-    static func dockerImage(version: String) -> Docker.Image {
-        .init(
-            repository: Self.dockerHubNamespace,
-            name: Self.dockerHubRepositoryName,
-            tag: .init(version)
-        )
-    }
-    
-    /// Docker volume paths to map on the local host
-    static var dockerVolumePaths: [String] {
-        [
+        
+        /// Docker container process for the given server name
+        static func process(for name: String) async -> Docker.Container? {
+            try? await Docker.containers.first { $0.name == name }
+        }
+        
+        /// Name of the server docker image
+        static func dockerImage(for version: String) -> Docker.Image {
+            .init(
+                repository: "rdall96",
+                name: "minecraft-server",
+                tag: .init(version)
+            )
+        }
+        
+        /// Name of the server config file on disk
+        static let configFileName = "config.json"
+        
+        /// Name of the server icon on disk
+        static let iconFileName = "icon.png"
+        
+        /// Name of the server mods directory on disk
+        static let modsDirectoryName = "mods"
+        
+        /// Docker volume paths to map on the local host
+        static let dockerVolumePaths: [String] = [
             "/minecraft/world",
+            "/minecraft/configurations",
             "/minecraft/mods"
         ]
+        
+        /// Default Minecraft server port on the container
+        static let minecraftServerPort: UInt16 = 25565
+        
+        /// Name of the Minecraft server process in the docker container
+        static let serverProcessName = "start_server"
+        
+        /// Name of the Minecraft server image namespace in DockerHub
+        static let dockerHubNamespace: DockerHub.Namespace = "rdall96"
+        
+        /// Name of the Minecraft server image repository in DockerHub
+        static let dockerHubRepositoryName: DockerHub.Repository.Name = "minecraft-server"
     }
-    
-    /// Default Minecraft server port on the container
-    static var minecraftServerPort: UInt16 { 25565 }
-    
-    /// Name of the Minecraft server process in the docker container
-    static var serverProcessName: String { "start_server.sh" }
 }
 
 // MARK: - Equatable
@@ -458,4 +471,74 @@ extension ServerRuntime.Command {
             .replacingOccurrences(of: "\"", with: "\\\("\"")") // double quotes will mess up the command structure, so escape them (this replaces " with \")
             .replacingOccurrences(of: "'", with: "\'") // the same goes for single quotes
     }
+}
+
+// MARK: - Status Regex
+extension Server.Status {
+    fileprivate static func latestStatus(in logs: String) -> Self {
+        // the order is always the same: starting, running, stopping
+        // so checking it backwards and short-circuiting when a regex matches, will give us the latest status
+        
+        if (try? ServerStatusRegex.stoppingRegex.firstMatch(in: logs)) != nil {
+            return .stopping
+        }
+        
+        if (try? ServerStatusRegex.runningRegex.firstMatch(in: logs)) != nil {
+            return .running
+        }
+        
+        if (try? ServerStatusRegex.startingRegex.firstMatch(in: logs)) != nil {
+            return .starting
+        }
+        
+        return .unknown
+    }
+}
+
+fileprivate enum ServerStatusRegex {
+    // thank you https://swiftregex.com for these awesome builder patterns
+    
+    // INFO\]:* Starting
+    static let startingRegex: Regex<Substring> = {
+        Regex {
+            "INFO]"
+            ZeroOrMore {
+                ":"
+            }
+            " Starting"
+        }
+        .anchorsMatchLineEndings()
+    }()
+    
+    // INFO\]:* Done \((\d+.\d+)s\)!
+    static let runningRegex: Regex<(Substring, Substring)> = {
+        Regex {
+            "INFO]"
+            ZeroOrMore {
+                ":"
+            }
+            " Done ("
+            Capture {
+                Regex {
+                    OneOrMore(.digit)
+                    One(".")
+                    OneOrMore(.digit)
+                }
+            }
+            "s)!"
+        }
+        .anchorsMatchLineEndings()
+    }()
+    
+    // INFO\]:* Stopping server
+    static let stoppingRegex: Regex<Substring> = {
+        Regex {
+            "INFO]"
+            ZeroOrMore {
+                ":"
+            }
+            " Stopping server"
+        }
+        .anchorsMatchLineEndings()
+    }()
 }
