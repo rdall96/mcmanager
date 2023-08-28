@@ -5,11 +5,6 @@ import JWT
 import Vapor
 import MCManager_Shared
 
-extension JWKIdentifier {
-    static let `public` = JWKIdentifier(string: "public")
-    static let `private` = JWKIdentifier(string: "private")
-}
-
 // configures your application
 public func configure(_ app: Application) async throws {
     // uncomment to serve files from /Public folder
@@ -33,19 +28,7 @@ public func configure(_ app: Application) async throws {
     try await routes(app)
 }
 
-fileprivate func setupKeys(_ app: Application) async throws {
-    let privateKeyPath = try app.directory.privateKeyPath
-    if !FileManager.default.fileExists(atPath: privateKeyPath.path) {
-        await app.directory.generateKeys(at: privateKeyPath)
-    }
-    let key = try String(contentsOfFile: try app.directory.publicKeyPath.path)
-    let keySigner = JWTSigner.hs256(key: key)
-    app.jwt.signers.use(keySigner, kid: .init(string: "default"), isDefault: true)
-}
-
-extension String {
-    fileprivate var bytes: [UInt8] { .init(self.utf8) }
-}
+// MARK: - Database
 
 fileprivate func connectDatabase(_ app: Application) throws {
     do {
@@ -55,7 +38,7 @@ fileprivate func connectDatabase(_ app: Application) throws {
             as: .sqlite,
             isDefault: true
         )
-        app.logger.info("Connected database at: \(databasePath)")
+        app.logger.info("Connected database at: \(databasePath.path)")
     }
     catch {
         app.logger.error("Failed to connect database!")
@@ -88,6 +71,25 @@ fileprivate func firstTimeSetup(_ app: Application) async throws {
         try await Settings.defaults.save(on: app.db)
     }
 }
+
+// MARK: - Key signing and security
+
+fileprivate func setupKeys(_ app: Application) async throws {
+    let privateKeyPath = try app.directory.privateKeyPath
+    if !FileManager.default.fileExists(atPath: privateKeyPath.path) {
+        await app.directory.generateKeys(at: privateKeyPath)
+    }
+    let key = try String(contentsOfFile: try app.directory.publicKeyPath.path)
+    let keySigner = JWTSigner.hs256(key: key)
+    app.jwt.signers.use(keySigner, kid: .init(string: "default"), isDefault: true)
+}
+
+extension JWKIdentifier {
+    static let `public` = JWKIdentifier(string: "public")
+    static let `private` = JWKIdentifier(string: "private")
+}
+
+// MARK: - Middleware
 
 fileprivate func addCorsMiddleware(to app: Application) {
     let corsConfiguration = CORSMiddleware.Configuration(

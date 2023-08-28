@@ -9,8 +9,9 @@ import Fluent
 import Vapor
 import MCManager_Shared
 
-struct SettingsController: RouteCollection {
+struct SettingsController: MCManagerAPIRoute, RouteCollection {
     
+    let logger: Logger
     /// Callback to execute when the settings are updated
     let onUpdate: (Settings) -> Void
     
@@ -60,6 +61,7 @@ struct SettingsController: RouteCollection {
         // save the new settings (this will create a DB entry if it doesn't exist)
         try await settings.save(on: req.db)
         onUpdate(settings)
+        logger.warning("Updated MCManager server settings, a restart might be required")
         return .ok
     }
 }

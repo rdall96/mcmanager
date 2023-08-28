@@ -10,13 +10,15 @@ import Vapor
 @_spi(MCManager_Server) import MCManager_Shared
 import MinecraftRuntime
 
-struct ServerController: RouteCollection {
+struct ServerController: MCManagerAPIRoute, RouteCollection {
     typealias MCServer = MCManager_Shared.Server
     
+    let logger: Logger
     let orchestra: ServerOrchestra
     
-    init(serversPath: URL) throws {
-        self.orchestra = try .init(serversRoot: serversPath)
+    init(serversPath: URL, logger: Logger) throws {
+        self.orchestra = try .init(serversRoot: serversPath, logger: logger)
+        self.logger = logger
     }
     
     func boot(routes: RoutesBuilder) throws {
@@ -154,6 +156,7 @@ struct ServerController: RouteCollection {
         }
         let cachedStatus = try await ServerStatusCache.find(serverId, on: database)
         if let cachedStatus, !cachedStatus.isExpired {
+            logger.info("Found cached status for server \(serverId)")
             return cachedStatus
         }
         else {
@@ -309,7 +312,9 @@ extension ServerController {
     
     /// Load all existing servers from the given database into the current runtime
     func loadExistingServers(from database: Database) async throws {
+        logger.info("Loading existing server")
         let servers = try await MCServer.query(on: database).all()
+        logger.notice("Found \(servers.count) existing server(s)")
         for server in servers {
             try await orchestra.add(server: server)
         }

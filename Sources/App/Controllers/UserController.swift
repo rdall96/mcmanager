@@ -9,7 +9,9 @@ import Fluent
 import Vapor
 import MCManager_Shared
 
-struct UserController: RouteCollection {
+struct UserController: MCManagerAPIRoute, RouteCollection {
+    let logger: Logger
+    
     func boot(routes: RoutesBuilder) throws {
         let users = routes
             .grouped(SessionToken.Authenticator())
@@ -124,6 +126,7 @@ struct UserController: RouteCollection {
         }
         // the superuser cannot be deleted
         guard !isSuperuser(user) else {
+            logger.error("Attempted to delete default admin user, operation not allowed")
             throw Abort(.custom(code: 400, reasonPhrase: "The admin user cannot be deleted"))
         }
         try await deleteSessions(for: user, on: req.db)

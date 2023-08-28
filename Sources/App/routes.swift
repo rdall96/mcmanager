@@ -1,6 +1,7 @@
 import Fluent
 import Vapor
 import MCManager_Shared
+import Logging
 
 func routes(_ app: Application) async throws {
     // create the parent API endpoint
@@ -12,9 +13,15 @@ func routes(_ app: Application) async throws {
 }
 
 // MARK: - API routes
-fileprivate struct API: RouteCollection {
+
+protocol MCManagerAPIRoute {
+    var logger: Logger { get }
+}
+
+fileprivate struct API: MCManagerAPIRoute, RouteCollection {
     
     let version: Version
+    let logger: Logger
     let settingsController: SettingsController
     let authenticationController: AuthenticationController
     let userController: UserController
@@ -22,18 +29,27 @@ fileprivate struct API: RouteCollection {
     
     init(version: Version) throws {
         self.version = version
-        settingsController = SettingsController { _ in
-            // Do any necessary updates that depend on the settings
-        }
-        authenticationController = AuthenticationController()
-        userController = UserController()
-        serverController = try ServerController(
-            serversPath: try DirectoryConfiguration.detect().serversPath
+        let logger = Logger(label: "mcmanager.api")
+        self.logger = logger
+        settingsController = SettingsController(
+            logger: logger,
+            onUpdate: { _ in
+                // Do any necessary updates that depend on the settings
+            }
         )
+        authenticationController = AuthenticationController(logger: logger)
+        userController = UserController(logger: logger)
+        serverController = try ServerController(
+            serversPath: try DirectoryConfiguration.detect().serversPath,
+            logger: logger
+        )
+        
+        logger.notice("API version: \(version.description)")
     }
     
     func boot(routes: RoutesBuilder) throws {
         let api = routes.grouped("api")
+        logger.info("Setting up API routes")
         
         // Register all API routes
         api.get("version") { _ async in

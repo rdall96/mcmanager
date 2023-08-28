@@ -9,7 +9,9 @@ import Fluent
 import Vapor
 import MCManager_Shared
 
-struct AuthenticationController: RouteCollection {
+struct AuthenticationController: MCManagerAPIRoute, RouteCollection {
+    let logger: Logger
+    
     func boot(routes: RoutesBuilder) throws {
         routes
             .grouped(User.asyncCredentialsAuthenticator())

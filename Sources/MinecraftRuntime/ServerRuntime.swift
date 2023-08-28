@@ -8,10 +8,13 @@
 import Foundation
 @_spi(MCManager_Runtime) import MCManager_Shared
 import DockerSwiftAPI
+import Logging
 import RegexBuilder
 
 final actor ServerRuntime: Identifiable {
     typealias Command = String
+    
+    private let logger: Logger
     
     /// ID of the server
     let id: UUID
@@ -32,11 +35,12 @@ final actor ServerRuntime: Identifiable {
     /// This is used to signal when the process needs to be updated on the next start
     private var processNeedsUpdate: Bool = false
     
-    init(info: Server, rootPath: URL) async throws {
+    init(info: Server, rootPath: URL, logger: Logger? = nil) async throws {
         guard let id = info.id else {
             throw MCRError.invalidServerId
         }
         self.id = id
+        self.logger = logger ?? Logger(label: "mcmanager.server.\(id.uuidString)")
         
         // create the local path
         path = rootPath.appendingPathComponent(id.pathSafeString)
@@ -72,6 +76,11 @@ final actor ServerRuntime: Identifiable {
     }
     
     deinit {}
+    
+    /// A textual representation fo this server runtime
+    var description: String {
+        "(\(self.id)) \(type.rawValue) \(version)"
+    }
     
     // MARK: - Computed Members
     
@@ -358,7 +367,7 @@ final actor ServerRuntime: Identifiable {
                     playerList = try await query.getPlayers()
                 }
                 catch {
-                    // TODO: Log an error here that the getPlayers() call failed, but don't surface it
+                    logger.warning("Failed to get player list on server \(id)")
                 }
             }
             
