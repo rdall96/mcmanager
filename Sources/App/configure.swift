@@ -32,7 +32,7 @@ public func configure(_ app: Application) async throws {
 
 fileprivate func connectDatabase(_ app: Application) throws {
     do {
-        let databasePath = try DirectoryConfiguration.detect().defaultDatabasePath
+        let databasePath = try app.directory.defaultDatabasePath
         app.databases.use(
             .sqlite(.file(databasePath.path)),
             as: .sqlite,
@@ -79,9 +79,9 @@ fileprivate func setupKeys(_ app: Application) async throws {
     if !FileManager.default.fileExists(atPath: privateKeyPath.path) {
         await app.directory.generateKeys(at: privateKeyPath)
     }
-    let key = try String(contentsOfFile: try app.directory.publicKeyPath.path)
+    let key = try String(contentsOfFile: privateKeyPath.path)
     let keySigner = JWTSigner.hs256(key: key)
-    app.jwt.signers.use(keySigner, kid: .init(string: "default"), isDefault: true)
+    app.jwt.signers.use(keySigner, kid: .private, isDefault: true)
 }
 
 extension JWKIdentifier {

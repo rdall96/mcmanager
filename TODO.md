@@ -2,7 +2,6 @@
 
 ## MVP
 - All the work for server queries was useless - the `Network` library doesn't work on linux yet :-(
-- Auth token singing with private key
 
 ## Ideas
 
