@@ -159,27 +159,6 @@ final class MCServerOrchestra {
         logger.info("Updated \(properties.count) server properties for \(serverID)")
     }
     
-    /// Get the icon for a server
-    func icon(for serverID: UUID) async throws -> MCServer.Icon? {
-        let server = try requireServer(id: serverID)
-        logger.info("Requesting server icon for \(serverID)")
-        return await server.icon
-    }
-    
-    /// Update the server icon
-    func updateIcon(_ icon: MCServer.Icon, for serverID: UUID) async throws {
-        let server = try requireServer(id: serverID)
-        try await server.updateIcon(icon)
-        logger.info("Updated server icon for \(serverID)")
-    }
-    
-    /// Remove the server icon
-    func removeIcon(for serverID: UUID) async throws {
-        let server = try requireServer(id: serverID)
-        await server.removeIcon()
-        logger.info("Deleted custom server icon for \(serverID)")
-    }
-    
     // MARK: - Execution
     
     /// Start a server
@@ -222,5 +201,27 @@ final class MCServerOrchestra {
         let server = try requireServer(id: serverID)
         logger.info("Requesting logs for server \(serverID)")
         return try await server.logs(tail: tail)
+    }
+    
+    // MARK: - File management
+    
+    func listFiles(at relativePath: String? = nil, for serverID: UUID) async throws -> [String] {
+        try requireServer(id: serverID)
+            .listFiles(at: relativePath)
+    }
+    
+    func saveFile(at url: URL, for serverID: UUID, to relativePath: String) async throws {
+        try await requireServer(id: serverID)
+            .saveFile(at: url, to: relativePath)
+    }
+    
+    func removeFile(at relativePath: String, for serverID: UUID) async throws {
+        try await requireServer(id: serverID)
+            .removeFile(at: relativePath)
+    }
+    
+    func file(at relativePath: String, from serverID: UUID) async throws -> URL? {
+        try requireServer(id: serverID)
+            .file(at: relativePath)
     }
 }

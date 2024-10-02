@@ -1,7 +1,7 @@
 # ================================
 # Build image
 # ================================
-FROM swift:5.8-jammy as build
+FROM swift:5.8-jammy AS build
 
 ARG C_OPTIMIZATION="-O2" \
   BUILD_TYPE="release"

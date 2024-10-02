@@ -77,8 +77,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vapor/jwt-kit.git",
       "state" : {
-        "revision" : "9e929d925434b91857661bcd455d1bd53f00bf22",
-        "version" : "4.13.0"
+        "revision" : "c2595b9ad7f512d7f334830b4df1fed6e917946a",
+        "version" : "4.13.4"
       }
     },
     {
@@ -145,15 +145,6 @@
       }
     },
     {
-      "identity" : "swift-backtrace",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/swift-server/swift-backtrace.git",
-      "state" : {
-        "revision" : "f25620d5d05e2f1ba27154b40cafea2b67566956",
-        "version" : "1.3.3"
-      }
-    },
-    {
       "identity" : "swift-collections",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-collections.git",
@@ -176,8 +167,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-crypto.git",
       "state" : {
-        "revision" : "60f13f60c4d093691934dc6cfdf5f508ada1f894",
-        "version" : "2.6.0"
+        "revision" : "ffca28be3c9c6a86a579949d23f68818a4b9b5d8",
+        "version" : "3.8.0"
       }
     },
     {
@@ -257,8 +248,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vapor/vapor.git",
       "state" : {
-        "revision" : "1bb4a2ed94bec7a92f92e82896408c785d068f5c",
-        "version" : "4.79.0"
+        "revision" : "1f2b44b1739ff5cdec6c6dfec40020f5d4b2a813",
+        "version" : "4.83.2"
       }
     },
     {
@@ -268,6 +259,15 @@
       "state" : {
         "revision" : "53fe0639a98903858d0196b699720decb42aee7b",
         "version" : "2.14.0"
+      }
+    },
+    {
+      "identity" : "zip",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/marmelroy/Zip.git",
+      "state" : {
+        "revision" : "67fa55813b9e7b3b9acee9c0ae501def28746d76",
+        "version" : "2.1.2"
       }
     }
   ],

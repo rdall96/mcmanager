@@ -21,6 +21,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
     }
     
     func boot(routes: RoutesBuilder) throws {
+        // V1 APIs
         let servers = routes
             .requireAuthentication()
             .apiVersion(.v1)
@@ -39,17 +40,22 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
             server.get("metrics", use: metrics)
             
             // properties & config
-            server.get("configuration", use: properties)
-            server.put("configuration", use: updateProperties)
-            server.get("icon", use: icon)
-            server.put("icon", use: updateIcon)
-            server.delete("icon", use: removeIcon)
+            server.get("properties", use: properties)
+            server.put("properties", use: updateProperties)
             
             // execution
             server.get("start", use: start)
             server.get("stop", use: stop)
             server.post("command", use: command)
             server.get("logs", use: logs)
+            
+            // files
+            server.group("files") { files in
+                files.get(use: browseFiles)
+                files.on(.POST, "upload", body: .stream, use: uploadFile)
+                files.delete("remove", use: removeFile)
+                files.get("download", use: downloadFile)
+            }
         }
         
         // runtime support
@@ -196,27 +202,6 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         return .ok
     }
     
-    func icon(req: Request) async throws -> MCServer.Icon {
-        let serverID = try req.serverID
-        guard let icon = try await orchestra.icon(for: serverID) else {
-            throw Abort(.notFound)
-        }
-        return icon
-    }
-    
-    func updateIcon(req: Request) async throws -> HTTPStatus {
-        let serverID = try req.serverID
-        let icon = try req.content.decode(MCServer.Icon.self)
-        try await orchestra.updateIcon(icon, for: serverID)
-        return .ok
-    }
-    
-    func removeIcon(req: Request) async throws -> HTTPStatus {
-        let serverID = try req.serverID
-        try await orchestra.removeIcon(for: serverID)
-        return .ok
-    }
-    
     // MARK: - Execution
     
     func start(req: Request) async throws -> HTTPStatus {
@@ -251,6 +236,69 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
             tail = UInt(tailValue)
         }
         return try await orchestra.logs(for: serverID, tail: tail)
+    }
+    
+    // MARK: - File management
+    
+    func browseFiles(req: Request) async throws -> FileBrowser {
+        let serverID = try req.serverID
+        let relativePath = req.query[String.self, at: "path"]
+        if try await orchestra.file(at: relativePath ?? "", from: serverID) == nil {
+            throw Abort(.notFound)
+        }
+        return FileBrowser(
+            relativePath: relativePath,
+            files: try await orchestra.listFiles(at: relativePath, for: serverID)
+        )
+    }
+    
+    func uploadFile(req: Request) async throws -> HTTPStatus {
+        let serverID = try req.serverID
+        
+        let metadata = try req.query.decode(FileUploadRequest.self)
+        let uploadSession = FileUploadSession(for: req, metadata: metadata)
+        
+        let uploadedFileURL: URL
+        do {
+            uploadedFileURL = try await uploadSession.get()
+        }
+        catch {
+            logger.error("Failed to upload file")
+            throw Abort(.internalServerError)
+        }
+        
+        try await orchestra.saveFile(
+            at: uploadedFileURL,
+            for: serverID,
+            to: metadata.filePath
+        )
+        
+        return .ok
+    }
+    
+    func removeFile(req: Request) async throws -> HTTPStatus {
+        let serverID = try req.serverID
+        guard let relativePath = req.query[String.self, at: "path"] else {
+            throw Abort(.badRequest)
+        }
+        if try await orchestra.file(at: relativePath, from: serverID) == nil {
+            throw Abort(.notFound)
+        }
+        try await orchestra.removeFile(at: relativePath, for: serverID)
+        return .ok
+    }
+    
+    func downloadFile(req: Request) async throws -> Response {
+        let serverID = try req.serverID
+        guard let relativePath = req.query[String.self, at: "path"] else {
+            throw Abort(.badRequest)
+        }
+        guard let fileURL = try await orchestra.file(at: relativePath, from: serverID) else {
+            throw Abort(.notFound)
+        }
+        
+        let downloadSession = try FileDownloadSession(for: req, url: fileURL)
+        return downloadSession.get()
     }
 }
 

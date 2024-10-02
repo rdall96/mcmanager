@@ -16,19 +16,25 @@ let package = Package(
         .package(url: "https://github.com/vapor/jwt.git", from: "4.2.2"),
         // Docker api
         .package(url: "https://gitlab.com/rdall96/docker-swift-api", from: "1.3.0"),
+        // Swift Crypto
+        .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
         // Swift commands
         .package(url: "https://github.com/qiuzhifei/swift-commands", from: "0.6.0"),
+        // Zip
+        .package(url: "https://github.com/marmelroy/Zip.git", from: "2.0.0"),
     ],
     targets: [
         .executableTarget(
             name: "MCManager",
             dependencies: [
+                .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "Commands", package: "swift-commands"),
                 .product(name: "DockerSwiftAPI", package: "docker-swift-api"),
                 .product(name: "Fluent", package: "fluent"),
                 .product(name: "FluentSQLiteDriver", package: "fluent-sqlite-driver"),
                 .product(name: "JWT", package: "jwt"),
                 .product(name: "Vapor", package: "vapor"),
+                .product(name: "Zip", package: "Zip"),
             ],
             swiftSettings: [
                 // Enable better optimizations when building in Release configuration. Despite the use of

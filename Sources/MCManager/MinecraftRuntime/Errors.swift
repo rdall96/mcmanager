@@ -8,6 +8,7 @@
 import Foundation
 
 enum MCServerError: LocalizedError {
+    case systemError(Error)
     case invalidServerId
     case invalidServerType
     case duplicateServer(UUID?)
@@ -26,6 +27,8 @@ enum MCServerError: LocalizedError {
     
     var errorDescription: String? {
         switch self {
+        case .systemError(_):
+            return "System error"
         case .invalidServerId:
             return "Invalid server ID"
         case .invalidServerType:
@@ -61,6 +64,8 @@ enum MCServerError: LocalizedError {
     
     var failureReason: String? {
         switch self {
+        case .systemError(let error):
+            return "\(error)"
         case .duplicateServer(let uuid):
             return "A server with this ID (\(uuid?.uuidString ?? "-")) already exists"
         case .executionError(let string):
@@ -86,7 +91,7 @@ enum MCServerError: LocalizedError {
     
     var recoverySuggestion: String? {
         switch self {
-        case .executionError(_), .downloadFailed, .deletionError(_):
+        case .systemError(_), .executionError(_), .downloadFailed, .deletionError(_):
             return "Try aagin later"
         case .creationError, .updateFailed(_):
             return "Check that the provided server parameters are correct"

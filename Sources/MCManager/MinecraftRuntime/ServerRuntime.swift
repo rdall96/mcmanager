@@ -51,13 +51,9 @@ final actor ServerRuntime: Identifiable {
         
         // Read the properties
         properties = try MCServer.Properties.read(
-            at: path.appendingPathComponent(Defaults.configFileName),
+            at: path.appendingPathComponent(Defaults.serverPropertiesFileName),
             createDefault: true
         )
-//        config = try MCServer.Config.read(
-//            at: path.appendingPathComponent(Defaults.configFileName),
-//            createDefault: true
-//        )
         
         // If there is no existing process for thsi server, create one
         if let process = await Defaults.process(for: Defaults.processName(for: id)) {
@@ -83,16 +79,6 @@ final actor ServerRuntime: Identifiable {
     /// A textual representation fo this server runtime
     var description: String {
         "(\(self.id)) \(type.rawValue) \(version)"
-    }
-    
-    // MARK: - Computed Members
-    
-    private var configURL: URL {
-        path.appendingPathComponent(Defaults.configFileName)
-    }
-    
-    private var iconPath: URL {
-        path.appendingPathComponent(Defaults.iconFileName)
     }
     
     // MARK: - Methods
@@ -138,32 +124,80 @@ final actor ServerRuntime: Identifiable {
             properties.updateValue(item.value, forKey: item.key)
         }
         // write the new config to disk
-        try properties.write(to: configURL)
+        try properties.write(to: path.appendingPathComponent(Defaults.serverPropertiesFileName))
         // Signal that we need to update the process the next time it starts
         processNeedsUpdate = true
     }
     
-    /// Read the serve ricon (if it exists) and return the base64 encoded data
-    var icon: MCServer.Icon? {
-        .init(atPath: iconPath)
-    }
-    
-    /// Update the server icon with the given base64 encoded icon data
-    func updateIcon(_ icon: MCServer.Icon) throws {
-        guard let data = Data(base64Encoded: icon.base64) else {
-            throw MCServerError.invalidIconData
+    nonisolated func listFiles(at relativePath: String? = nil) throws -> [String] {
+        let searchPath: URL
+        if let relativePath {
+            searchPath = path.appendingPathComponent(relativePath)
         }
+        else {
+            searchPath = path
+        }
+        
+        var files: [String] = []
         do {
-            try data.write(to: iconPath)
+            files = try FileManager.default.contentsOfDirectory(
+                at: searchPath,
+                includingPropertiesForKeys: nil,
+                options: .skipsHiddenFiles
+            ).compactMap {
+                if $0.hasDirectoryPath {
+                    return "\($0.lastPathComponent)/"
+                }
+                else {
+                    return $0.lastPathComponent
+                }
+            }
         }
         catch {
-            throw MCServerError.updateFailed(error)
+            logger.error("Failed to list server files: \(error)")
+            throw MCServerError.systemError(error)
+        }
+        
+        // Remove files we don't want to surface
+        files.removeAll { Defaults.privateFileNames.contains($0) }
+        return files
+    }
+    
+    nonisolated func saveFile(at url: URL, to relativePath: String) async throws {
+        if await isRunning {
+            throw MCServerError.executionError("Can't add a file to the server while it's running")
+        }
+        do {
+            try FileManager.default.copyItem(
+                at: url,
+                to: path.appendingPathComponent(relativePath)
+            )
+        }
+        catch {
+            logger.error("Failed to save file: \(error)")
+            throw MCServerError.systemError(error)
         }
     }
     
-    /// Remove the server icon
-    func removeIcon() {
-        try? FileManager.default.removeItem(at: iconPath)
+    nonisolated func removeFile(at relativePath: String) async throws {
+        if await isRunning {
+            throw MCServerError.executionError("Can't delete a file while rhe server is running")
+        }
+        do {
+            try FileManager.default.removeItem(at: path.appendingPathComponent(relativePath))
+        }
+        catch {
+            logger.error("Failed to delete file: \(error)")
+            throw MCServerError.systemError(error)
+        }
+    }
+    
+    nonisolated func file(at relativePath: String) -> URL? {
+        let fileURL = path.appendingPathComponent(relativePath)
+        guard FileManager.default.fileExists(atPath: fileURL.path) else {
+            return nil
+        }
+        return fileURL
     }
     
     // MARK: - Docker runtime
@@ -408,14 +442,13 @@ extension ServerRuntime {
             )
         }
         
-        /// Name of the server config file on disk
-        static let configFileName = "config.plist"
+        /// Name of the server properties file on disk
+        static let serverPropertiesFileName = "server-properties.mcmanager"
         
-        /// Name of the server icon on disk
-        static let iconFileName = "icon.png"
-        
-        /// Name of the server mods directory on disk
-        static let modsDirectoryName = "mods"
+        /// Names of server files that are private to MCManager
+        static let privateFileNames: [String] = [
+            serverPropertiesFileName,
+        ]
         
         /// Docker volume paths to map on the local host
         static let dockerVolumePaths: [String] = [

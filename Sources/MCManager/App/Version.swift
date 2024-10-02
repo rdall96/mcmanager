@@ -7,6 +7,7 @@
 
 enum APIVersion: String {
     case v1
+    case v2
 }
 
 struct AppVersion {
