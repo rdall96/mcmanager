@@ -14,7 +14,7 @@ extension ServerStatusCache {
                 .id()
                 .field(ServerStatusCache.FieldKeys.expiresAt.rawValue, .datetime, .required)
                 .field(ServerStatusCache.FieldKeys.infoData.rawValue, .data, .required)
-                .field(ServerStatusCache.FieldKeys.metricsData.rawValue, .data, .required)
+                .field(ServerStatusCache.FieldKeys.statsData.rawValue, .data, .required)
                 .ignoreExisting()
                 .create()
         }

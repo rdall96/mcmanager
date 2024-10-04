@@ -12,19 +12,19 @@ extension MCServer {
     struct Info: Content {
         /// Current status of the server
         let status: Status
+        /// If true, this server needs a restart in order to apply all updated configurations
+        let needsRestart: Bool
         /// List of currently active players on the server
-        let onlinePlayers: [String]
-        /// Maximum number of players allowed on this server
-        let maximumPlayerCount: UInt
+//        let onlinePlayers: [String]
         
         init(
             status: Status,
-            onlinePlayers: [String],
-            maximumPlayerCount: UInt
+            needsRestart: Bool,
+            onlinePlayers: [String]
         ) {
             self.status = status
-            self.onlinePlayers = onlinePlayers
-            self.maximumPlayerCount = maximumPlayerCount
+            self.needsRestart = needsRestart
+//            self.onlinePlayers = onlinePlayers
         }
     }
 }
@@ -34,7 +34,7 @@ extension MCServer {
 extension MCServer.Info: Codable {
     private enum CodingKeys: String, CodingKey {
         case status
-        case onlinePlayers = "online_players"
-        case maximumPlayerCount = "maximum_player_count"
+        case needsRestart = "needs_restart"
+//        case onlinePlayers = "online_players"
     }
 }

@@ -37,7 +37,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
             
             // status
             server.get("info", use: info)
-            server.get("metrics", use: metrics)
+            server.get("stats", use: stats)
             
             // properties & config
             server.get("properties", use: properties)
@@ -165,7 +165,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
                 id: serverID,
                 ttl: settings.serverStatusCacheTTLSeconds,
                 info: try await orchestra.info(for: serverID),
-                metrics: try await orchestra.metrics(for: serverID)
+                stats: try await orchestra.stats(for: serverID)
             )
             try await status.save(on: database)
             return status
@@ -180,10 +180,10 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         return info
     }
     
-    func metrics(req: Request) async throws -> MCServer.Metrics {
+    func stats(req: Request) async throws -> MCServer.Stats {
         let serverID = try req.serverID
-        guard let metrics = try await serverStatus(for: serverID, on: req.db)?.metrics else {
-            return try await orchestra.metrics(for: serverID)
+        guard let metrics = try await serverStatus(for: serverID, on: req.db)?.stats else {
+            return try await orchestra.stats(for: serverID)
         }
         return metrics
     }

@@ -15,6 +15,7 @@ final class ServerStatusCache: Model, Content {
         case expiresAt = "expires_at"
         case infoData = "info"
         case metricsData = "metrics"
+        case statsData = "stats"
     }
     
     @ID(key: .id)
@@ -27,8 +28,8 @@ final class ServerStatusCache: Model, Content {
     @Field(key: FieldKeys.infoData.rawValue)
     private var infoData: Data?
     
-    @Field(key: FieldKeys.metricsData.rawValue)
-    private var metricsData: Data?
+    @Field(key: FieldKeys.statsData.rawValue)
+    private var statsData: Data?
     
     init() {}
     
@@ -36,12 +37,12 @@ final class ServerStatusCache: Model, Content {
         id: UUID,
         ttl: UInt,
         info: MCServer.Info,
-        metrics: MCServer.Metrics
+        stats: MCServer.Stats
     ) {
         self.id = id
         self.expiresAt = .now.addingTimeInterval(Double(ttl))
         self.infoData = try? JSONEncoder().encode(info)
-        self.metricsData = try? JSONEncoder().encode(metrics)
+        self.statsData = try? JSONEncoder().encode(stats)
     }
     
     var isExpired: Bool { expiresAt < .now }
@@ -53,8 +54,8 @@ final class ServerStatusCache: Model, Content {
     }
     
     /// Cached `Server.Metrics` value
-    var metrics: MCServer.Metrics? {
-        guard let metricsData else { return nil }
-        return try? JSONDecoder().decode(MCServer.Metrics.self, from: metricsData)
+    var stats: MCServer.Stats? {
+        guard let statsData else { return nil }
+        return try? JSONDecoder().decode(MCServer.Stats.self, from: statsData)
     }
 }

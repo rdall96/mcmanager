@@ -389,32 +389,19 @@ final actor ServerRuntime: Identifiable {
                 }
             }
             
-            // the max player count is stored in the server config
-            let maxPlayerCount: UInt
-            switch properties.value(forKey: "MAX_PLAYERS") {
-            case .number(let int):
-                maxPlayerCount = UInt(int)
-            default:
-                maxPlayerCount = 0
-            }
-            
-            return .init(
+            return MCServer.Info(
                 status: status,
-                onlinePlayers: playerList,
-                maximumPlayerCount: maxPlayerCount
+                needsRestart: processNeedsUpdate,
+                onlinePlayers: playerList
             )
         }
     }
     
     /// Metrics for the server process
-    var metrics: MCServer.Metrics {
+    var stats: MCServer.Stats {
         get async throws {
             let stats = try await Docker.stats(of: process)
-            return .init(
-                needsRestart: processNeedsUpdate,
-                cpuPercent: stats.cpuPercent,
-                memoryUsage: stats.memoryUsageBytes
-            )
+            return MCServer.Stats(cpuPercent: stats.cpuPercent, memoryUsage: stats.memoryUsageBytes)
         }
     }
 }

@@ -92,7 +92,7 @@ final class MCServerOrchestra {
         )
         serverRuntimes[serverID] = runtime
         let runtimeDescription = await runtime.description
-        logger.info("Added server: \(runtimeDescription)")
+        logger.notice("Added server: \(runtimeDescription)")
     }
     
     /// Update the info for the given server
@@ -137,10 +137,10 @@ final class MCServerOrchestra {
     }
     
     /// Usage metrics for the current server process
-    func metrics(for serverID: UUID) async throws -> MCServer.Metrics {
+    func stats(for serverID: UUID) async throws -> MCServer.Stats {
         let server = try requireServer(id: serverID)
         logger.info("Getting runtime metrics for server \(serverID)")
-        return try await server.metrics
+        return try await server.stats
     }
     
     // MARK: - Properties & config
