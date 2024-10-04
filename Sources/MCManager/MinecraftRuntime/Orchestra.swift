@@ -32,25 +32,37 @@ final class MCServerOrchestra {
     
     /// Clean up unused files on the system
     func cleanup() async throws {
-        // prunes unused docker images
-        do {
-            try await Docker.systemPrune()
-        }
-        catch {
-            throw MCServerError.dockerError(error)
-        }
-        // remove the files for unused servers
+        // Find any unused servers
         let allServersOnDisk = try FileManager.default.contentsOfDirectory(
             at: serversRoot,
             includingPropertiesForKeys: [.isDirectoryKey],
             options: .skipsSubdirectoryDescendants
         )
-        let unusedServersOnDisk: [URL] = allServersOnDisk.filter {
-            guard let uuid = UUID(uuidString: $0.lastPathComponent) else { return false }
-            return serverRuntimes[uuid] == nil
+        let unusedServerIDs: [UUID] = allServersOnDisk.compactMap {
+            guard let uuid = UUID(uuidString: $0.lastPathComponent),
+                  serverRuntimes[uuid] == nil
+            else {
+                return nil
+            }
+            return uuid
         }
-        for unusedServerPath in unusedServersOnDisk {
-            try FileManager.default.removeItem(at: unusedServerPath)
+        
+        // Remove files for the unused servers
+        for serverID in unusedServerIDs {
+            let serverPath = serversRoot.appendingPathComponent(serverID.uuidString)
+            try FileManager.default.removeItem(at: serverPath)
+        }
+        
+        // Remove any containers for the unused servers
+        let unusedProcessNames = unusedServerIDs.compactMap {
+            ServerRuntime.Defaults.processName(for: $0)
+        }
+        let unusedContainers = try await Docker.containers.filter {
+            guard let containerName = $0.name else { return false }
+            return unusedProcessNames.contains(containerName)
+        }
+        for unusedContainer in unusedContainers {
+            try await Docker.remove(container: unusedContainer, removeVolumes: true, force: true)
         }
     }
     
