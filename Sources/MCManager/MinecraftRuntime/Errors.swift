@@ -24,6 +24,7 @@ enum MCServerError: LocalizedError {
     case invalidServerProperty(String)
     case dockerError(Error)
     case failedToSendCommand
+    case serverIsRunning
     
     var errorDescription: String? {
         switch self {
@@ -59,6 +60,8 @@ enum MCServerError: LocalizedError {
             return "Unknown server runtime error"
         case .failedToSendCommand:
             return "An error occurred when sending the command to the server"
+        case .serverIsRunning:
+            return "Can't perform action while the server is running"
         }
     }
     
@@ -84,6 +87,8 @@ enum MCServerError: LocalizedError {
             return "\(string) is not a valid server property name"
         case .dockerError(let error):
             return "Docker threw an error: \(error.localizedDescription)"
+        case .serverIsRunning:
+            return "The server is running"
         default:
             return nil
         }
@@ -95,6 +100,8 @@ enum MCServerError: LocalizedError {
             return "Try aagin later"
         case .creationError, .updateFailed(_):
             return "Check that the provided server parameters are correct"
+        case .serverIsRunning:
+            return "Stop the server and try again"
         default:
             return nil
         }

@@ -171,10 +171,15 @@ final class FileDownloadSession {
         
         // If the file is a folder, we should compress it
         if FileManager.default.isDirectory(at: url) {
+            let directoryContents = try FileManager.default.contentsOfDirectory(
+                at: url,
+                includingPropertiesForKeys: nil,
+                options: .skipsHiddenFiles
+            )
             let compressedFileURL = FileManager.default.temporaryDirectory
-                .appendingPathComponent("mcmanager-download-\(request.id)-\(url.lastPathComponent)")
+                .appendingPathComponent("mcmanager-download-\(request.id)-\(url.lastPathComponent).zip")
             try Zip.zipFiles(
-                paths: [url],
+                paths: directoryContents,
                 zipFilePath: compressedFileURL,
                 password: nil,
                 compression: .DefaultCompression,
@@ -187,15 +192,13 @@ final class FileDownloadSession {
         }
     }
     
-    deinit {
-        if let compressedFileURL {
-            try? FileManager.default.removeItem(at: compressedFileURL)
-        }
-    }
-    
     func get() -> Response {
         let downloadURL: URL = compressedFileURL ?? url
-        return request.fileio.streamFile(at: downloadURL.path, mediaType: HTTPMediaType(for: downloadURL))
+        return request.fileio.streamFile(at: downloadURL.path, mediaType: HTTPMediaType(for: downloadURL)) { _ in
+            if let compressedFileURL = self.compressedFileURL {
+                try? FileManager.default.removeItem(at: compressedFileURL)
+            }
+        }
     }
 }
 

@@ -27,7 +27,6 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
             .apiVersion(.v1)
             .grouped("servers")
         
-        // management
         servers.get(use: all)
         servers.post(use: create)
         servers.group(":serverID") { server in

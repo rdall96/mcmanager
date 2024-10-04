@@ -16,11 +16,11 @@ final actor ServerRuntime: Identifiable {
     private let logger: Logger
     
     /// ID of the server
-    let id: UUID
+    nonisolated let id: UUID
     /// Path of the server files on disk
-    let path: URL
+    nonisolated let path: URL
     /// Type of Minecraft server
-    let type: MCServer.ServerType
+    nonisolated let type: MCServer.ServerType
     /// Version of Minecraft
     private(set) var version: String
     /// Port this server is hosted on
@@ -181,7 +181,7 @@ final actor ServerRuntime: Identifiable {
     
     nonisolated func removeFile(at relativePath: String) async throws {
         if await isRunning {
-            throw MCServerError.executionError("Can't delete a file while rhe server is running")
+            throw MCServerError.serverIsRunning
         }
         do {
             try FileManager.default.removeItem(at: path.appendingPathComponent(relativePath))
