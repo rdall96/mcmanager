@@ -49,6 +49,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
             server.get("logs", use: logs)
             
             // files
+            server.get("download", use: download)
             server.group("files") { files in
                 files.get(use: browseFiles)
                 files.on(.POST, "upload", body: .stream, use: uploadFile)
@@ -238,6 +239,20 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
     }
     
     // MARK: - File management
+    
+    func download(req: Request) async throws -> Response {
+        let serverID = try req.serverID
+        let fileURL: URL
+        do {
+            fileURL = try await orchestra.downloadServer(with: serverID)
+        }
+        catch MCServerError.invalidServerId {
+            throw Abort(.notFound)
+        }
+        
+        let downloadSession = try FileDownloadSession(for: req, url: fileURL)
+        return downloadSession.get()
+    }
     
     func browseFiles(req: Request) async throws -> FileBrowser {
         let serverID = try req.serverID

@@ -217,6 +217,14 @@ final class MCServerOrchestra {
     
     // MARK: - File management
     
+    func downloadServer(with serverID: UUID) async throws -> URL {
+        let server = try requireServer(id: serverID)
+        if await server.isRunning {
+            throw MCServerError.serverIsRunning
+        }
+        return server.path
+    }
+    
     func listFiles(at relativePath: String? = nil, for serverID: UUID) async throws -> [String] {
         try requireServer(id: serverID)
             .listFiles(at: relativePath)
