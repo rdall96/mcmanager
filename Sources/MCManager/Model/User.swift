@@ -70,18 +70,16 @@ final class User: Model, Content {
     var isAdmin: Bool {
         isSuperAdmin || adminPrivileges == .admin
     }
-}
-
-// MARK: - Codable
-extension User: Codable {
+    
+    // MARK: - Codable
     
     private enum CodingKeys: String, CodingKey {
         case id
         case username
         case password
-        case createdAt = "created_at"
-        case updatedAt = "updated_at"
-        case isAdmin = "is_admin"
+        case createdAt
+        case updatedAt
+        case isAdmin
     }
     
     // override decoding to set defaults so we can allow partial updates

@@ -26,15 +26,13 @@ extension MCServer {
             self.needsRestart = needsRestart
 //            self.onlinePlayers = onlinePlayers
         }
-    }
-}
-
-// MARK: - Codable
-
-extension MCServer.Info: Codable {
-    private enum CodingKeys: String, CodingKey {
-        case status
-        case needsRestart = "needs_restart"
-//        case onlinePlayers = "online_players"
+        
+        // MARK: - Codable
+        
+        private enum CodingKeys: String, CodingKey {
+            case status
+            case needsRestart
+//            case onlinePlayers
+        }
     }
 }

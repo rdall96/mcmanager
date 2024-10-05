@@ -13,7 +13,7 @@ extension MCServer {
      Data regarding the types and game versions that can be used to create a server.
      This should be used a reference before calling `createServer`.
      */
-    struct RuntimeSupport: Codable, Content {
+    struct RuntimeSupport: Content {
         let type: ServerType
         let versions: [Version]
         

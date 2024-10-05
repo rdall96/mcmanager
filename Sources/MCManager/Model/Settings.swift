@@ -62,12 +62,12 @@ final class Settings: Model, Content {
         }
         return ports.intersection(Self.validPortRange)
     }
-}
-
-extension Settings: Codable {
+    
+    // MARK: - Codable
+    
     private enum CodingKeys: String, CodingKey {
-        case serverStatusCacheTTLSeconds = "server_status_cache_ttl_seconds"
-        case allowedServerPorts = "allowed_server_ports"
+        case serverStatusCacheTTLSeconds
+        case allowedServerPorts
     }
     
     // override decoding to ensure we do type checking

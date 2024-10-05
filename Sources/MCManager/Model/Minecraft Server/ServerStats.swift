@@ -19,14 +19,12 @@ extension MCServer {
             self.cpuPercent = cpuPercent
             self.memoryUsageBytes = memoryUsage
         }
-    }
-}
-
-// MARK: - Codable
-
-extension MCServer.Stats: Codable {
-    private enum CodingKeys: String, CodingKey {
-        case cpuPercent = "cpu_percent"
-        case memoryUsageBytes = "memory_usage"
+        
+        // MARK: - Codable
+        
+        private enum CodingKeys: String, CodingKey {
+            case cpuPercent
+            case memoryUsageBytes
+        }
     }
 }

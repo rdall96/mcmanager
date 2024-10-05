@@ -75,19 +75,17 @@ final class MCServer: Model, Content {
             port: port
         )
     }
-}
-
-// MARK: - Codable
-
-extension MCServer: Codable {
-    private enum CodingKeys: String, CodingKey {
+    
+    // MARK: - Codable
+    
+    enum CodingKeys: String, CodingKey {
         case id
         case name
         case type
         case version
         case port
-        case createdAt = "created_at"
-        case updatedAt = "updated_at"
+        case createdAt
+        case updatedAt
     }
     
     convenience init(from decoder: Decoder) throws {

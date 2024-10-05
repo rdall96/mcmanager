@@ -11,7 +11,7 @@ import Crypto
 import NIOCore
 import Zip
 
-struct FileBrowser: Codable, Content {
+struct FileBrowser: Content {
     let path: String
     let files: [String]
     

@@ -9,7 +9,7 @@ import Foundation
 import Vapor
 
 extension MCServer {
-    struct Properties: Codable, Content {
+    struct Properties: Content {
         typealias Key = String
         
         private(set) var data: [Key : Value]
