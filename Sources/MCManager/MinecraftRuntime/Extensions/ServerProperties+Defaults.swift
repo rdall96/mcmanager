@@ -11,41 +11,62 @@ import DockerSwiftAPI
 extension MCServer.Properties {
     
     static var defaults: Self {
-        .init([
-            "ALLOW_FLIGHT" : .flag(false),
-            "ALLOW_NETHER" : .flag(true),
-            "DIFFICULTY" : .text("easy"),
-            "ENABLE_COMMAND_BLOCK" : .flag(false),
-            "ENABLE_STATUS" : .flag(true),
-            "ENFORCE_SECURE_PROFILE" : .flag(true),
-            "GAMEMODE" : .text("survival"),
-            "GENERATE_STRUCTURES" : .flag(true),
-            "HARDCORE" : .flag(false),
-            "HIDE_ONLINE_PLAYERS" : .flag(false),
-            "LEVEL_SEED" : .text(""),
-            "LEVEL_TYPE" : .text("minecraft:normal"),
-            "MAX_PLAYERS" : .number(10),
-            "MOTD" : .text("Hosted with MCManager"),
-            "ONLINE_MODE" : .flag(true),
-            "OP_PERMISSION_LEVEL" : .number(4),
-            "PLAYER_IDLE_TIMEOUT" : .number(0),
-            "PVP" : .flag(true),
-            "RESOURCE_PACK" : .text(""),
-            "RESOURCE_PACK_PROMPT" : .text(""),
-            "REQUIRE_RESOURCE_PACK" : .flag(false),
-            "SIMULATION_DISTANCE" : .number(10),
-            "SPAWN_ANIMALS" : .flag(true),
-            "SPAWN_MONSTERS" : .flag(true),
-            "SPAWN_NPCS" : .flag(true),
-            "SPAWN_PROTECTION" : .number(16),
-            "VIEW_DISTANCE" : .number(10),
-            "WHITE_LIST" : .flag(false),
-        ])
+        MCServer.Properties(
+            allowFlight: .false,
+            allowNether: .true,
+            difficulty: .easy,
+            enableCommandBlock: .false,
+            enableStatus: .true,
+            enforceSecureProfile: .true,
+            gamemode: .init(rawValue: "survival"),
+            generateStructures: .true,
+            hardcore: .false,
+            hideOnlinePlayers: .false,
+            levelSeed: .init(rawValue: ""),
+            leveType: .init(rawValue: "minecraft:normal"),
+            maxPlayers: .init(rawValue: 10),
+            maxTickTime: .init(rawValue: 60000),
+            maxWorldSize: .init(rawValue: 29999984),
+            motd: .init(rawValue: "Hosted with MCManager"),
+            onlineMode: .true,
+            opPermissionLevel: .init(rawValue: 4),
+            playerIdleTimeout: .init(rawValue: 0),
+            pvp: .true,
+            resourcePack: .init(rawValue: ""),
+            resourcePackPrompt: .init(rawValue: ""),
+            requireResourcePack: .false,
+            simulationDistance: .init(rawValue: 10),
+            spawnAnimals: .true,
+            spawnMonsters: .true,
+            spawnNPCs: .true,
+            spawnProtection: .init(rawValue: 16),
+            viewDistance: .init(rawValue: 10),
+            whiteList: .false
+        )
+    }
+    
+    /// Number of properties that aren't nil
+    var count: UInt {
+        dictionary.reduce(0) { result, next in
+            guard next.value != nil else {
+                return result
+            }
+            return result + 1
+        }
     }
     
     /// An environment varaible representation of the current property as key=value
     var environmentVariables: [Docker.ContainerSpec.EnvironmentVariable] {
-        data.compactMap { .init(key: $0.key, value: $0.value.description) }
+        dictionary.compactMap {
+            // Skip nil values
+            guard let value = $0.value else { return nil }
+            // Env var names should be snake case and all caps
+            let name = camelCaseToSnakeCase($0.key).uppercased()
+            return Docker.ContainerSpec.EnvironmentVariable(
+                key: name,
+                value: value.description
+            )
+        }
     }
     
     /// Read the server config at the given file path. If the config file can't be found, you can specify to create one using the default values
@@ -68,4 +89,12 @@ extension MCServer.Properties {
         try PropertyListEncoder().encode(self)
             .write(to: url, options: .atomic)
     }
+}
+
+fileprivate func camelCaseToSnakeCase(_ input: String) -> String {
+    let pattern = "([a-z0-9])([A-Z])"
+    let regex = try! NSRegularExpression(pattern: pattern, options: [])
+    let range = NSRange(location: 0, length: input.utf16.count)
+    let result = regex.stringByReplacingMatches(in: input, options: [], range: range, withTemplate: "$1_$2")
+    return result.lowercased()
 }

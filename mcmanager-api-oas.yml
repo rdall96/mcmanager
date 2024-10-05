@@ -123,7 +123,95 @@ components:
           example: 536870912
     ServerProperties:
       type: object
-      description: 'Dictionary of all server properties. Spelled in all caps snake case (i.e.: MAX_PLAYERS)'
+      description: Dictionary of all server properties
+      properties:
+        allowFlight:
+            type: boolean
+            example: false
+        allowNether:
+            type: boolean
+            example: true
+        difficulty:
+            type: string
+            example: 'easy'
+        enableCommandBlock:
+            type: boolean
+            example: false
+        enableStatus:
+            type: boolean
+            example: true
+        enforceSecureProfile:
+            type: boolean
+            example: true
+        gamemode:
+            type: string
+            example: 'survival'
+        generateStructures:
+            type: boolean
+            example: true
+        hardcore:
+            type: boolean
+            example: false
+        hideOnlinePlayers:
+            type: boolean
+            example: false
+        levelSeed:
+            type: string
+        leveType:
+            type: string
+            example: 'minecraft:normal'
+        maxPlayers:
+            type: integer
+            example: 10
+        maxTickTime:
+            type: integer
+            example: 60000
+        maxWorldSize:
+            type: integer
+            example: 29999984
+        motd:
+            type: string
+            example: 'Hosted with MCManager'
+        onlineMode:
+            type: boolean
+            example: true
+        opPermissionLevel:
+            type: integer
+            example: 4
+        playerIdleTimeout:
+            type: integer
+            example: 0
+        pvp:
+            type: boolean
+            example: true
+        resourcePack:
+            type: string
+        resourcePackPrompt:
+            type: string
+        requireResourcePack:
+            type: boolean
+            example: false
+        simulationDistance:
+            type: integer
+            example: 10
+        spawnAnimals:
+            type: boolean
+            example: true
+        spawnMonsters:
+            type: boolean
+            example: true
+        spawnNPCs:
+            type: boolean
+            example: true
+        spawnProtection:
+            type: integer
+            example: 16
+        viewDistance:
+            type: integer
+            example: 10
+        whiteList:
+            type: boolean
+            example: false
     FileBrowser:
       type: object
       description: List of files at the provided path for a server
@@ -399,6 +487,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ServerStats'
+  /api/v1/servers/properties:
+    get:
+      summary: Default values for the Minecraft server properties
+      tags: [Servers]
+      security:
+        - AccessToken: []
+      responses:
+        '200':
+          description: Fetched server properties
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerProperties'
   /api/v1/servers/{id}/properties:
     get:
       summary: Fetch the Minecraft server properties (runtime settings)

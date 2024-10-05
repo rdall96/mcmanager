@@ -60,6 +60,8 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         
         // runtime support
         servers.get("support", use: support)
+        // default properties
+        servers.get("properties", use: defaultProperties)
     }
     
     // MARK: - Server management
@@ -189,6 +191,10 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
     }
     
     // MARK: - Properties & config
+    
+    func defaultProperties(req: Request) async throws -> MCServer.Properties {
+        MCServer.Properties.defaults
+    }
     
     func properties(req: Request) async throws -> MCServer.Properties {
         let serverID = try req.serverID

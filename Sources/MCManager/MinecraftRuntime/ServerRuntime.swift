@@ -116,13 +116,7 @@ final actor ServerRuntime: Identifiable {
     
     /// Update the server config (aka: server properties). This also supports partial updates
     func updateProperties(_ newProperties: MCServer.Properties) throws {
-        for item in newProperties.data {
-            // ensure the item exists in the current config
-            guard properties.contains(item.key) else {
-                throw MCServerError.invalidServerProperty(item.key)
-            }
-            properties.updateValue(item.value, forKey: item.key)
-        }
+        properties.update(with: newProperties)
         // write the new config to disk
         try properties.write(to: path.appendingPathComponent(Defaults.serverPropertiesFileName))
         // Signal that we need to update the process the next time it starts
