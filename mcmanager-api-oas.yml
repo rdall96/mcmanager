@@ -1,0 +1,776 @@
+openapi: '3.0.3'
+info:
+  title: MCManager API
+  version: '1.0'
+servers:
+  - description: Dev Server
+    url: http://mcmanager.kr-home.net
+tags:
+  - name: Authentication
+    description: Login/Logout
+  - name: Info
+    description: Server information
+  - name: Settings
+    description: Application settings
+  - name: Servers
+    description: Interact with Minecraft servers
+  - name: Users
+    description: User operations
+components:
+  securitySchemes:
+    AccessToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: boolean
+        reason:
+          type: string
+    UserCredentials:
+      type: object
+      properties:
+        username:
+          type: string
+          example: 'admin'
+        password:
+          type: string
+          example: 'mcmanager'
+    AuthenticationToken:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          example: 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjp7ImlzX2FkbWluIjp0cnVlLCJ1c2VybmFtZSI6ImFkbWluIiwiY3JlYXRlZF9hdCI6MTcyODA5NDk3My4zMzI3Mzk4LCJpZCI6IkM4OTQ0RTM4LUVGODQtNEU1RC1CNkVCLTMxN0Q4QUJGQ0YwNyIsInVwZGF0ZWRfYXQiOjE3MjgwOTQ5NzMuMzMyNzQxfSwiZXhwIjoxNzI4MTgyMTkzLjk4NDMxMiwic3ViIjoibWNtYW5hZ2VyIiwiaWF0IjoxNzI4MDk1NzkzLjk4NDMxMiwiaWQiOiJCOTU3MEVBNy00RkEzLTRBNTItOTU5Ni01RjdGQjFBQUMzN0QifQ.S6YUfHA8iuQ-RaSASI1MRO0lmIXpeV6-8ki2Xxgx-gQ'
+    ApplicationSettings:
+      type: object
+      properties:
+        serverStatusCacheTTLSeconds:
+          type: integer
+          example: 5
+        allowedServerPorts:
+          type: string
+          example: '1024-65535'
+    ServerSupport:
+      type: object
+      properties:
+        type:
+          type: string
+          example: 'java'
+        versions:
+          type: array
+          example: ['1.21.1', '1.21', '1.20.6']
+    ServerMetadata:
+      type: object
+      properties:
+        name:
+          type: string
+          example: 'Server A'
+        type:
+          type: string
+          example: 'java'
+        version:
+          type: string
+          example: '1.20.1'
+        port:
+          type: integer
+          example: 25565
+    Server:
+      type: object
+      properties:
+        id:
+          type: string
+          example: 'E18DE084-C565-4059-8DD5-1AE50E997CD1'
+        name:
+          type: string
+          example: 'Server A'
+        type:
+          type: string
+          example: 'java'
+        version:
+          type: string
+          example: '1.20.1'
+        port:
+          type: integer
+          example: 25565
+        createdAt:
+          type: string
+          example: '2024-10-05T02:58:28Z'
+        updatedAt:
+          type: string
+          example: '2024-10-05T02:58:28Z'
+    ServerInfo:
+      type: object
+      properties:
+        status:
+          type: string
+          example: 'running'
+        needsRestart:
+          type: boolean
+          description: The server needs to be restarted in order to apply a setting/configuration change
+          example: true
+    ServerStats:
+      type: object
+      properties:
+        cpuPercent:
+          type: number
+          example: 12.3
+        memoryUsageBytes:
+          type: integer
+          example: 536870912
+    ServerProperties:
+      type: object
+      description: 'Dictionary of all server properties. Spelled in all caps snake case (i.e.: MAX_PLAYERS)'
+    FileBrowser:
+      type: object
+      description: List of files at the provided path for a server
+      properties:
+        path:
+          type: string
+          example: '/'
+        files:
+          type: array
+          example: [
+            'configurations/',
+            'world/',
+            'mods'
+          ]
+    UserCreationModel:
+      type: object
+      description: Information about the user to create
+      properties:
+        username:
+          type: string
+          example: notch
+        password:
+          type: string
+          example: g0D@pPl3
+        isAdmin:
+          type: boolean
+          example: false
+    User:
+      type: object
+      description: User details
+      properties:
+        id:
+          type: string
+          example: '6FA743DB-1F8A-4726-BC94-4089D2F6F59C'
+        username:
+          type: string
+          example: 'testUser'
+        isAdmin:
+          type: boolean
+          example: false
+        createdAt:
+          type: string
+          example: '2024-10-05T04:20:42Z'
+        updatedAt:
+          type: string
+          example: '2024-10-05T04:20:42Z'
+paths:
+  /auth/login:
+    post:
+      summary: Authenticate with the application
+      tags: [Authentication]
+      requestBody:
+        required: true
+        description: User credentials
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserCredentials'
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthenticationToken'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /auth/logout:
+    get:
+      summary: Logout the current user
+      tags: [Authentication]
+      security:
+        - AccessToken: []
+      responses:
+        '204':
+          description: Successfully logged out
+          content: {}
+  /auth/key:
+    get:
+      summary: Get the signing key
+      tags: [Authentication]
+      responses:
+        '200':
+          description: Fetched signing key
+          content:
+            text/plain:
+              schema:
+                example: 'AAAAB3NzaC1yc2EAAAADAQ...jYPbyCn6UraJ2p'
+  /version:
+    get:
+      summary: Get the version of the running app
+      tags: [Info]
+      responses:
+        '200':
+          description: Successful response
+          content:
+            text/plain:
+              schema:
+                example: '1.0.0'
+  /api/v1/settings:
+    get:
+      summary: List current server settings
+      tags: [Settings]
+      security:
+        - AccessToken: []
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplicationSettings'
+    put:
+      summary: Edit the application settings
+      tags: [Settings]
+      security:
+        - AccessToken: []
+      requestBody:
+        required: true
+        description: Settings to update (partial allowed)
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplicationSettings'
+      responses:
+        '200':
+          description: Settings updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplicationSettings'
+  /api/v1/servers/support:
+    get:
+      summary: Information about servers that can be created
+      tags: [Servers]
+      security:
+        - AccessToken: []
+      responses:
+        '200':
+          description: These are the servers you can create
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ServerSupport'
+  /api/v1/servers:
+    get:
+      summary: List all servers
+      tags: [Servers]
+      security:
+        - AccessToken: []
+      parameters:
+        - in: query
+          name: type
+          type: string
+          description: Filter server by type
+      responses:
+        '200':
+          description: Fetched servers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Server'
+    post:
+      summary: Create a new server
+      tags: [Servers]
+      security:
+        - AccessToken: []
+      requestBody:
+        required: true
+        description: Information of the server to create
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServerMetadata'
+      responses:
+        '200':
+          description: Server successfully created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Server'
+  /api/v1/servers/{id}:
+    get:
+      summary: Fetch an existing server
+      tags: [Servers]
+      security:
+        - AccessToken: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          type: string
+          description: The server ID
+      responses:
+        '200':
+          description: Fetched servers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Server'
+        '404':
+          description: User not found
+    put:
+      summary: Edit a server
+      tags: [Servers]
+      security:
+        - AccessToken: []
+      requestBody:
+        required: true
+        description: Information to edit on the server
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServerMetadata'
+      responses:
+        '200':
+          description: Server successfully edited
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Server'
+    delete:
+      summary: Edit a server
+      tags: [Servers]
+      security:
+        - AccessToken: []
+      responses:
+        '200':
+          description: Server successfully deleted
+  /api/v1/servers/{id}/info:
+    get:
+      summary: Fetch information about a server
+      tags: [Servers]
+      security:
+        - AccessToken: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          type: string
+          description: The server ID
+      responses:
+        '200':
+          description: Fetched server information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerInfo'
+  /api/v1/servers/{id}/stats:
+    get:
+      summary: Fetch usage statistics about a server
+      tags: [Servers]
+      security:
+        - AccessToken: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          type: string
+          description: The server ID
+      responses:
+        '200':
+          description: Fetched server statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerStats'
+  /api/v1/servers/{id}/properties:
+    get:
+      summary: Fetch the Minecraft server properties (runtime settings)
+      tags: [Servers]
+      security:
+        - AccessToken: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          type: string
+          description: The server ID
+      responses:
+        '200':
+          description: Fetched server properties
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerProperties'
+    put:
+      summary: Update the Minecraft server properties
+      tags: [Servers]
+      security:
+        - AccessToken: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          type: string
+          description: The server ID
+      requestBody:
+        required: true
+        description: Server properties to update (partial updates allowed)
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServerProperties'
+      responses:
+        '200':
+          description: Updated server properties, returns list of all properties
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerProperties'
+  /api/v1/servers/{id}/start:
+    get:
+      summary: Start a server
+      tags: [Servers]
+      security:
+        - AccessToken: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          type: string
+          description: The server ID
+      responses:
+        '200':
+          description: Sent request to start the server
+        '500':
+          description: Failed to start the server
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/servers/{id}/stop:
+    get:
+      summary: Stop a server
+      tags: [Servers]
+      security:
+        - AccessToken: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          type: string
+          description: The server ID
+      responses:
+        '200':
+          description: Sent request to stop the server
+        '500':
+          description: Failed to stop the server
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/servers/{id}/logs:
+    get:
+      summary: Get log messages for a server
+      tags: [Servers]
+      security:
+        - AccessToken: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          type: string
+          description: The server ID
+        - in: query
+          name: tail
+          type: integer
+          description: Limit the number of latest logs to fetch
+      responses:
+        '200':
+          description: Fetched server logs
+          content:
+            application/json:
+              schema:
+                type: array
+                example: [
+                  '[03:57:12] [Server thread/INFO]: Preparing level \"world\"',
+                  '[03:57:17] [Server thread/INFO]: Preparing start region for dimension minecraft:overworld',
+                  '[03:57:18] [Worker-Main-5/INFO]: Preparing spawn area: 0%',
+                ]
+  /api/v1/servers/{id}/command:
+    post:
+      summary: Send a command to the server console
+      tags: [Servers]
+      security:
+        - AccessToken: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          type: string
+          description: The server ID
+      requestBody:
+        required: true
+        description: The server command to send
+        content:
+          text/plain:
+            example: '/weather clear'
+      responses:
+        '200':
+          description: Command sent
+        '500':
+          description: Failed to send command
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/servers/{id}/files:
+    post:
+      summary: Browse server files at the given path (root path of the server by default)
+      tags: [Servers]
+      security:
+        - AccessToken: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          type: string
+          description: The server ID
+        - in: query
+          name: path
+          type: string
+          description: Server path to browse
+      requestBody:
+        required: true
+        description: The server command to send
+        content:
+          text/plain:
+            example: '/weather clear'
+      responses:
+        '200':
+          description: List of files at the provided path
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileBrowser'
+  /api/v1/servers/{id}/files/upload:
+    post:
+      summary: Upload a file to the server
+      tags: [Servers]
+      security:
+        - AccessToken: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          type: string
+          description: The server ID
+        - in: query
+          name: type
+          required: true
+          type: string
+          description: Type of file to upload (file/directory)
+        - in: query
+          name: path
+          required: true
+          type: string
+          description: Path where to upload the file on the server
+        - in: query
+          name: checksum
+          required: true
+          type: string
+          description: SHA256 of the uploaded file to verify the data
+      requestBody:
+        required: true
+        description: The binary data of the file to upload
+        content:
+          application/octect-stream: {}
+      responses:
+        '200':
+          description: List of files at the provided path
+  /api/v1/servers/{id}/files/remove:
+    delete:
+      summary: Delete a file on the server
+      tags: [Servers]
+      security:
+        - AccessToken: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          type: string
+          description: The server ID
+        - in: query
+          name: path
+          required: true
+          type: string
+          description: Path of the file to delete
+      responses:
+        '200':
+          description: File deleted successfully
+  /api/v1/servers/{id}/files/download:
+    get:
+      summary: Download a server file
+      tags: [Servers]
+      security:
+        - AccessToken: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          type: string
+          description: The server ID
+        - in: query
+          name: path
+          required: true
+          type: string
+          description: Path of the file to download
+      responses:
+        '200':
+          description: File downloaded successfully
+          content:
+            application/octect-stream: {}
+  /api/v1/servers/{id}/download:
+    get:
+      summary: Package and download a server for local use
+      tags: [Servers]
+      security:
+        - AccessToken: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          type: string
+          description: The server ID
+      responses:
+        '200':
+          description: Server downloaded successfully
+          content:
+            application/octect-stream: {}
+  /api/v1/users:
+    get:
+      summary: List all users
+      tags: [Users]
+      security:
+        - AccessToken: []
+      responses:
+        '200':
+          description: Fetched all users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+    post:
+      summary: Create a new user
+      tags: [Users]
+      security:
+        - AccessToken: []
+      requestBody:
+        required: true
+        description: Details of the user to create
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreationModel'
+      responses:
+        '200':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+  /api/v1/users/{id}:
+    get:
+      summary: Get details about a user
+      tags: [Users]
+      security:
+        - AccessToken: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          type: string
+          description: The user ID
+      responses:
+        '200':
+          description: Fetched user details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          description: User not found
+    put:
+      summary: Update user details
+      tags: [Users]
+      security:
+        - AccessToken: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          type: string
+          description: The user ID
+      requestBody:
+        required: true
+        description: Details to update on the user (partial updates allowed)
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreationModel'
+      responses:
+        '200':
+          description: Updated user details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          description: User not found
+    delete:
+      summary: Delete a user
+      tags: [Users]
+      security:
+        - AccessToken: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          type: string
+          description: The user ID
+      responses:
+        '200':
+          description: User deleted
+        '404':
+          description: User not found
+  /api/v1/users/profile:
+    get:
+      summary: Get details about the current user
+      tags: [Users]
+      security:
+        - AccessToken: []
+      responses:
+        '200':
+          description: Fetched user details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
