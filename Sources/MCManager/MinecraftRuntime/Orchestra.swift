@@ -69,10 +69,7 @@ final class MCServerOrchestra {
     // MARK: - Server management
     
     private func requireServer(_ server: MCServer) throws -> UUID {
-        guard let uuid = server.id,
-              serverRuntimes[uuid] != nil
-        else {
-            logger.error("Missing server with id \"\(server.id?.uuidString ?? "unknown")\"!")
+        guard let uuid = server.id, serverRuntimes[uuid] != nil else {
             throw MCServerError.invalidServerId
         }
         return uuid
@@ -80,7 +77,6 @@ final class MCServerOrchestra {
     
     private func requireServer(id uuid: UUID) throws -> ServerRuntime {
         guard let serverRuntime = serverRuntimes[uuid] else {
-            logger.error("Server with id \"\(uuid.uuidString)\" not found!")
             throw MCServerError.invalidServerId
         }
         return serverRuntime
@@ -90,11 +86,10 @@ final class MCServerOrchestra {
     func add(server: MCServer) async throws {
         // ensure this server doesn't already exist
         guard let serverID = server.id else {
-            logger.error("Missing id for server \"\(server.name)\"!")
-            throw MCServerError.invalidServerId
+            throw MCServerError.creationError
         }
         guard serverRuntimes[serverID] == nil else {
-            logger.error("Attempted to add a duplicate server with id \"\(serverID)\"")
+            logger.error("Attempted to add a server with a duplicate id \"\(serverID)\"")
             throw MCServerError.duplicateServer(serverID)
         }
         let runtime = try await ServerRuntime(
@@ -127,12 +122,17 @@ final class MCServerOrchestra {
     /// Get information regarding all supported runtimes that can be used to create new servers
     var allSupportedRuntimes: [MCServer.RuntimeSupport] {
         get async throws {
-            logger.info("Fetching supported runtimes")
-            let allTags = try await DockerHub.tags(
-                for: ServerRuntime.Defaults.dockerHubRepositoryName,
-                in: ServerRuntime.Defaults.dockerHubNamespace
-            ).compactMap { $0.name }
-            logger.info("Found \(allTags.count) tag(s) on DockerHub")
+            let allTags: [DockerHub.Tag.Name]
+            do {
+                allTags = try await DockerHub.tags(
+                    for: ServerRuntime.Defaults.dockerHubRepositoryName,
+                    in: ServerRuntime.Defaults.dockerHubNamespace
+                ).compactMap { $0.name }
+            }
+            catch {
+                logger.error("Faield to fetch supported server runtime info: \(error)")
+                throw MCServerError.systemError(error)
+            }
             return MCServer.ServerType.allCases.compactMap {
                 .init(type: $0, versions: MCServer.RuntimeSupport.tags(for: $0, from: allTags))
             }
@@ -144,14 +144,12 @@ final class MCServerOrchestra {
     /// Information regarding the currect server process
     func info(for serverID: UUID) async throws -> MCServer.Info {
         let server = try requireServer(id: serverID)
-        logger.info("Getting game info for server \(serverID)")
         return try await server.info
     }
     
     /// Usage metrics for the current server process
     func stats(for serverID: UUID) async throws -> MCServer.Stats {
         let server = try requireServer(id: serverID)
-        logger.info("Getting runtime metrics for server \(serverID)")
         return try await server.stats
     }
     
@@ -160,7 +158,6 @@ final class MCServerOrchestra {
     /// Get the server config (aka server properties)
     func properties(for serverID: UUID) async throws -> MCServer.Properties {
         let server = try requireServer(id: serverID)
-        logger.info("Getting runtime configuration for server \(serverID)")
         return await server.properties
     }
     
@@ -176,17 +173,14 @@ final class MCServerOrchestra {
     /// Start a server
     func startServer(with serverID: UUID) async throws {
         let server = try requireServer(id: serverID)
-        logger.info("Starting server \(serverID)")
-        // ensure the server isn't already running
         if await server.isRunning {
-            logger.warning("Did not start server \(serverID). Reason: it was already running")
-            throw MCServerError.executionError("This server is already running")
+            throw MCServerError.serverIsRunning
         }
         // check if this port is already in use by another running server
         let serverPort = await server.port
         for runtime in serverRuntimes.values {
             if await runtime.isRunning, await runtime.port == serverPort {
-                logger.warning("Did not start server \(serverID). Reason: server port \(serverPort) is already in use")
+                logger.warning("Did not start server \(serverID) because another server is uring the same port \(serverPort)")
                 throw MCServerError.executionError("This port is already in use by another server")
             }
         }
@@ -197,21 +191,17 @@ final class MCServerOrchestra {
     /// Stop a server
     func stopServer(with serverID: UUID) async throws {
         let server = try requireServer(id: serverID)
-        logger.info("Stopping server \(serverID)")
         try await server.stop()
         logger.notice("Requested server \(serverID) to stop")
     }
     
     func sendCommand(_ command: String, to serverID: UUID) async throws {
         let server = try requireServer(id: serverID)
-        logger.info("Sending command to server \(serverID)")
         try await server.sendCommand(command)
-        logger.notice("Sent command to \(serverID): \(command)")
     }
     
     func logs(for serverID: UUID, tail: UInt? = nil) async throws -> [String] {
         let server = try requireServer(id: serverID)
-        logger.info("Requesting logs for server \(serverID)")
         return try await server.logs(tail: tail)
     }
     

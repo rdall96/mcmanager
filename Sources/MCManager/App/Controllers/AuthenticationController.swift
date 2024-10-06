@@ -29,7 +29,7 @@ struct AuthenticationController: MCManagerAPIRoute, RouteCollection {
     func login(req: Request) async throws -> ClientSession {
         let user = try req.auth.require(User.self)
         guard let payload = try SessionToken.token(for: user) else {
-            throw Abort(.unauthorized)
+            throw Abort(.unauthorized, reason: "Invalid credentials")
         }
         try await payload.save(on: req.db)
         let token = try req.jwt.sign(payload)
@@ -59,7 +59,8 @@ struct AuthenticationController: MCManagerAPIRoute, RouteCollection {
             // where the first string is the type, the second the actual key,
             // and optionally there will be a third component with the user and hostname of the shell that generated it
             guard keyComponents.count > 1 else {
-                throw Abort(.custom(code: 500, reasonPhrase: "Corrupted public key data"))
+                logger.critical("Corrupted public key data")
+                throw Abort(.internalServerError)
             }
             // we only care about the key component
             return keyComponents[1]

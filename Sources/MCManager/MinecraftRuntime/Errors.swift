@@ -10,19 +10,13 @@ import Foundation
 enum MCServerError: LocalizedError {
     case systemError(Error)
     case invalidServerId
-    case invalidServerType
     case duplicateServer(UUID?)
     case executionError(String)
-    case noServerRuntimeFound
-    case downloadFailed
     case creationError
     case deletionError(String)
     case updateFailed(Error)
-    case invalidIconData
-    case missingServerProperties(URL)
     case corruptedServerProperties(URL, Error)
-    case invalidServerProperty(String)
-    case dockerError(Error)
+    case runtimeError(Error)
     case failedToSendCommand
     case serverIsRunning
     
@@ -32,36 +26,24 @@ enum MCServerError: LocalizedError {
             return "System error"
         case .invalidServerId:
             return "Invalid server ID"
-        case .invalidServerType:
-            return "Invalid server type"
         case .duplicateServer(_):
             return "The server already exists"
         case .executionError(_):
             return "Server execution error"
-        case .noServerRuntimeFound:
-            return "No process found for the server"
-        case .downloadFailed:
-            return "Failed to download server"
         case .creationError:
             return "Failed to create server"
         case .deletionError(_):
             return "Failed to delete server"
         case .updateFailed(_):
             return "Failed to update server"
-        case .invalidIconData:
-            return "Icon data is invalid"
-        case .missingServerProperties(_):
-            return "Missing server properties file"
         case .corruptedServerProperties(_, _):
             return "Corrupted server properties"
-        case .invalidServerProperty(_):
-            return "Invalid server property name"
-        case .dockerError(_):
-            return "Unknown server runtime error"
+        case .runtimeError(_):
+            return "A server runtime error occurred"
         case .failedToSendCommand:
-            return "An error occurred when sending the command to the server"
+            return "Failed to send command to the server"
         case .serverIsRunning:
-            return "Can't perform action while the server is running"
+            return "Can't perform this action while the server is running"
         }
     }
     
@@ -77,27 +59,21 @@ enum MCServerError: LocalizedError {
             return string
         case .updateFailed(let error):
             return error.localizedDescription
-        case .invalidIconData:
-            return "The icon data needs to be base64 encoded"
-        case .missingServerProperties(let url):
-            return "No server properties file found at \(url.path)"
-        case .corruptedServerProperties(let url, let error):
-            return "The server properties file at \(url.path) could not be read due to an error: \(error.localizedDescription)"
-        case .invalidServerProperty(let string):
-            return "\(string) is not a valid server property name"
-        case .dockerError(let error):
-            return "Docker threw an error: \(error.localizedDescription)"
+        case .corruptedServerProperties(_, let error):
+            return "The server properties file could not be read due to an error: \(error.localizedDescription)"
+        case .runtimeError(let error):
+            return "Server runtime failure: \(error.localizedDescription)"
         case .serverIsRunning:
-            return "The server is running"
+            return "This action can't be performed on a running server"
         default:
-            return nil
+            return errorDescription
         }
     }
     
     var recoverySuggestion: String? {
         switch self {
-        case .systemError(_), .executionError(_), .downloadFailed, .deletionError(_):
-            return "Try aagin later"
+        case .systemError(_), .executionError(_), .deletionError(_), .failedToSendCommand:
+            return "Try again later"
         case .creationError, .updateFailed(_):
             return "Check that the provided server parameters are correct"
         case .serverIsRunning:

@@ -93,6 +93,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
             try await orchestra.add(server: server)
         }
         catch {
+            logger.critical("Failed to create server: \(error)")
             try await server.delete(on: req.db)
             throw error
         }
@@ -131,13 +132,14 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         try await server.delete(on: req.db)
         do {
             try await orchestra.deleteServer(id: serverID)
-            // remove any status cache
-            try await ServerStatusCache.find(serverID, on: req.db)?.delete(on: req.db)
         }
         catch {
+            logger.critical("Failed to delete server from disk, attempting to restore it")
             try await server.restore(on: req.db)
             throw error
         }
+        try? await ServerStatusCache.find(serverID, on: req.db)?
+            .delete(on: req.db)
         return .noContent
     }
     
@@ -156,7 +158,6 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         }
         let cachedStatus = try await ServerStatusCache.find(serverID, on: database)
         if let cachedStatus, !cachedStatus.isExpired {
-            logger.info("Found cached status for server \(serverID)")
             return cachedStatus
         }
         else {
@@ -229,7 +230,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
     func command(req: Request) async throws -> HTTPStatus {
         let serverID = try req.serverID
         guard let command = try? req.content.decode(String.self) else {
-            throw Abort(.badRequest)
+            throw Abort(.badRequest, reason: "Missing command in request body")
         }
         try await orchestra.sendCommand(command, to: serverID)
         return .ok
@@ -253,7 +254,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
             fileURL = try await orchestra.downloadServer(with: serverID)
         }
         catch MCServerError.invalidServerId {
-            throw Abort(.notFound)
+            throw Abort(.notFound, reason: "The requested server does not exist")
         }
         
         let downloadSession = try FileDownloadSession(for: req, url: fileURL)
@@ -284,7 +285,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         }
         catch {
             logger.error("Failed to upload file")
-            throw Abort(.internalServerError)
+            throw Abort(.internalServerError, reason: "Failed to upload file")
         }
         
         try await orchestra.saveFile(
@@ -299,10 +300,10 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
     func removeFile(req: Request) async throws -> HTTPStatus {
         let serverID = try req.serverID
         guard let relativePath = req.query[String.self, at: "path"] else {
-            throw Abort(.badRequest)
+            throw Abort(.badRequest, reason: "Missing file path to remove in request query")
         }
         if try await orchestra.file(at: relativePath, from: serverID) == nil {
-            throw Abort(.notFound)
+            throw Abort(.notFound, reason: "The specified file path does not exist")
         }
         try await orchestra.removeFile(at: relativePath, for: serverID)
         return .ok
@@ -311,10 +312,10 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
     func downloadFile(req: Request) async throws -> Response {
         let serverID = try req.serverID
         guard let relativePath = req.query[String.self, at: "path"] else {
-            throw Abort(.badRequest)
+            throw Abort(.badRequest, reason: "Missing path of file to download in request query")
         }
         guard let fileURL = try await orchestra.file(at: relativePath, from: serverID) else {
-            throw Abort(.notFound)
+            throw Abort(.notFound, reason: "The specified file path does not exist")
         }
         
         let downloadSession = try FileDownloadSession(for: req, url: fileURL)
@@ -332,9 +333,9 @@ extension ServerController {
     
     /// Load all existing servers from the given database into the current runtime
     func loadExistingServers(from database: Database) async throws {
-        logger.debug("Loading existing servers")
+        logger.info("Loading existing servers")
         let servers = try await MCServer.query(on: database).all()
-        logger.info("Found \(servers.count) existing server(s)")
+        logger.notice("Found \(servers.count) existing server(s)")
         for server in servers {
             try await orchestra.add(server: server)
         }
@@ -345,8 +346,9 @@ extension ServerController {
         let settings = try await settings(on: database)
         // check the server port
         if !settings.allowedServerPortsData.contains(server.port) {
-            throw Abort(.badRequest, reason: "The selected server port is outside of the allowed range")
+            throw Abort(.badRequest, reason: "Server port not in allowed range")
         }
+        // TODO: check the server version against the supported runtimes?
     }
 }
 
@@ -357,7 +359,7 @@ fileprivate extension Request {
             guard let id = self.parameters.get("serverID"),
                   let uuid = UUID(uuidString: id)
             else {
-                throw Abort(.notFound)
+                throw Abort(.notFound, reason: "Missing server ID in request path")
             }
             return uuid
         }
@@ -366,7 +368,7 @@ fileprivate extension Request {
     var server: MCServer {
         get async throws {
             guard let server = try await MCServer.find(try self.serverID, on: self.db) else {
-                throw Abort(.notFound)
+                throw Abort(.notFound, reason: "The requested server does not exist")
             }
             return server
         }

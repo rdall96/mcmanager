@@ -60,14 +60,20 @@ final actor ServerRuntime: Identifiable {
             self.process = process
         }
         else {
-            // this will automatically pull the image as well
-            self.process = try await Docker.create(
-                .init(name: Defaults.processName(for: id)),
-                from: Defaults.dockerImage(for: version),
-                pull: true // pull the image so we have the latest one ready
-            )
-            // Signal to update the container the next time it's run, since we didn't do a good creating all the properties above
-            processNeedsUpdate = true
+            do {
+                // this will automatically pull the image as well
+                self.process = try await Docker.create(
+                    .init(name: Defaults.processName(for: id)),
+                    from: Defaults.dockerImage(for: version),
+                    pull: true // pull the image so we have the latest one ready
+                )
+                // Signal to update the container the next time it's run, since we didn't do a good creating all the properties above
+                processNeedsUpdate = true
+            }
+            catch {
+                logger?.critical("Failed to create server \(id.uuidString) due to a docker error: \(error)")
+                throw MCServerError.creationError
+            }
         }
         
         // Check the current server status (it could have been running through an MCManager restart)
@@ -95,18 +101,13 @@ final actor ServerRuntime: Identifiable {
     
     /// Delete the server
     func delete() async throws {
-        if !(await isRunning) {
-            throw MCServerError.deletionError("Can't delete the server while it's running")
+        if await isRunning {
+            throw MCServerError.serverIsRunning
         }
-        // remove the container
         do {
+            // remove the container
             try await Docker.remove(container: process, force: true)
-        }
-        catch {
-            throw MCServerError.deletionError(error.localizedDescription)
-        }
-        // delete the files from disk
-        do {
+            // delete the files from disk
             try FileManager.default.removeItem(at: path)
         }
         catch {
@@ -117,8 +118,14 @@ final actor ServerRuntime: Identifiable {
     /// Update the server config (aka: server properties). This also supports partial updates
     func updateProperties(_ newProperties: MCServer.Properties) throws {
         properties.update(with: newProperties)
-        // write the new config to disk
-        try properties.write(to: path.appendingPathComponent(Defaults.serverPropertiesFileName))
+        do {
+            // write the new config to disk
+            try properties.write(to: path.appendingPathComponent(Defaults.serverPropertiesFileName))
+        }
+        catch {
+            logger.error("Failed to update server properties: \(error)")
+            throw MCServerError.updateFailed(error)
+        }
         // Signal that we need to update the process the next time it starts
         processNeedsUpdate = true
     }
@@ -198,9 +205,16 @@ final actor ServerRuntime: Identifiable {
     
     /// Refresh the process status
     private func updateStatus() async {
-        let dockerStatus = (try? await Docker.status(of: process)) ?? .unknown
-        if dockerStatus == .running {
-            let logs = (try? await Docker.logs(for: process)) ?? []
+        let dockerStatus: Docker.Container.Status
+        do {
+            dockerStatus = try await Docker.status(of: process)
+        }
+        catch {
+            logger.critical("Failed to fetch container status from docker: \(error)")
+            dockerStatus = .unknown
+        }
+        if case .running = dockerStatus {
+            let logs = (try? await logs()) ?? []
             status = MCServer.Status.latestStatus(in: logs.joined(separator: "\n"))
         }
         else {
@@ -272,17 +286,6 @@ final actor ServerRuntime: Identifiable {
         )
     }
     
-    /// Ensure the server runtime (process) is the most up to date version by checkign the internal member processNeedsUpdate and create a new container of necessary
-    private func recreateProcess() async throws {
-        try await Docker.remove(container: process)
-        self.process = try await Docker.create(
-            dockerConfig,
-            from: Defaults.dockerImage(for: version),
-            pull: true
-        )
-        processNeedsUpdate = false
-    }
-    
     /// Monitor the server start/stop cycle to accurately report the `status`
     private func waitForStatus(_ desiredStatus: MCServer.Status) async {
         while self.status != desiredStatus {
@@ -298,18 +301,40 @@ final actor ServerRuntime: Identifiable {
     /// Start the server
     func start() async throws {
         if await isRunning {
-            throw MCServerError.executionError("The server is already running")
+            throw MCServerError.serverIsRunning
         }
-        try await recreateProcess()
+        
+        // Ensure the server runtime (process) is the most up to date version by checking the internal
+        // member processNeedsUpdate and create a new container of necessary
+        if processNeedsUpdate {
+            do {
+                try await Docker.remove(container: process)
+                self.process = try await Docker.create(
+                    dockerConfig,
+                    from: Defaults.dockerImage(for: version),
+                    pull: true
+                )
+            }
+            catch {
+                status = .error
+                logger.critical("Failed to re-create server process: \(error)")
+                throw MCServerError.runtimeError(error)
+            }
+            processNeedsUpdate = false
+        }
+        
         // update status manually to notify the server is starting
         status = .starting
         do {
             try await Docker.start(process)
-            Task(priority: .background) { await waitForStatus(.running) }
         }
         catch {
             status = .error
-            throw MCServerError.dockerError(error)
+            logger.critical("Failed to start server: \(error)")
+            throw MCServerError.runtimeError(error)
+        }
+        Task(priority: .background) {
+            await waitForStatus(.running)
         }
     }
     
@@ -320,11 +345,14 @@ final actor ServerRuntime: Identifiable {
         status = .stopping
         do {
             try await sendCommand("stop")
-            Task(priority: .background) { await waitForStatus(.stopped) }
         }
         catch {
             status = .error
-            throw MCServerError.dockerError(error)
+            logger.critical("Failed to send stop command to the server: \(error)")
+            throw MCServerError.runtimeError(error)
+        }
+        Task(priority: .background) {
+            await waitForStatus(.stopped)
         }
     }
     
@@ -342,22 +370,31 @@ final actor ServerRuntime: Identifiable {
             <minecraft_command_output>
          3. Make sure to wrap every command in (/bin/bash -c "<command>") to ensure we run in a working shell
          */
-        let pid = try await Docker.exec("/bin/bash -c \"ps axf | grep \(Defaults.serverProcessName) | grep -v grep\"", in: process)
+        let pid = try? await Docker.exec("/bin/bash -c \"ps axf | grep \(Defaults.serverProcessName) | grep -v grep\"", in: process)
+            .compactMap { String($0) }
             .split(separator: " ")
             .first
         guard let pid else {
+            logger.critical("No process ID found for running server to send command")
             throw MCServerError.failedToSendCommand
         }
         do {
             try await Docker.exec("/bin/bash -c \"echo \(command.sanitized) > /proc/\(pid)/fd/0\"", in: process)
         }
         catch {
-            throw MCServerError.failedToSendCommand
+            logger.error("Failed to send server command: \(error)")
+            throw MCServerError.runtimeError(error)
         }
     }
     
     func logs(tail: UInt? = nil) async throws -> [String] {
-        try await Docker.logs(for: process, tail: tail)
+        do {
+            return try await Docker.logs(for: process, tail: tail)
+        }
+        catch {
+            logger.error("Failed to get server logs: \(error)")
+            throw MCServerError.runtimeError(error)
+        }
     }
     
     // MARK: - Status
@@ -380,6 +417,7 @@ final actor ServerRuntime: Identifiable {
                 }
                 catch {
                     logger.warning("Failed to get player list on server \(id)")
+                    // TODO: Throw an error here when the server queries are working
                 }
             }
             
@@ -394,7 +432,14 @@ final actor ServerRuntime: Identifiable {
     /// Metrics for the server process
     var stats: MCServer.Stats {
         get async throws {
-            let stats = try await Docker.stats(of: process)
+            let stats: Docker.Container.Stats
+            do {
+                stats = try await Docker.stats(of: process)
+            }
+            catch {
+                logger.critical("Failed to fetch server stats from docker: \(error)")
+                throw MCServerError.runtimeError(error)
+            }
             return MCServer.Stats(cpuPercent: stats.cpuPercent, memoryUsage: stats.memoryUsageBytes)
         }
     }

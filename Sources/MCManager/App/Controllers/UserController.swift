@@ -87,7 +87,7 @@ struct UserController: MCManagerAPIRoute, RouteCollection {
         // the superuser cannot be deleted
         guard !user.isSuperAdmin else {
             logger.error("Attempted to delete default admin user, operation not allowed")
-            throw Abort(.custom(code: 400, reasonPhrase: "The admin user cannot be deleted"))
+            throw Abort(.forbidden, reason: "The admin user cannot be deleted")
         }
         
         // delete existing user sessions
@@ -108,7 +108,9 @@ fileprivate extension Request {
     var user: User {
         get async throws {
             let user = try await User.find(self.parameters.get("userID"), on: self.db)
-            guard let user else { throw Abort(.notFound) }
+            guard let user else {
+                throw Abort(.notFound, reason: "The requested user does not exist")
+            }
             return user
         }
     }
