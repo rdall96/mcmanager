@@ -9,7 +9,7 @@ tags:
   - name: Authentication
     description: Login/Logout
   - name: Info
-    description: Server information
+    description: Application details
   - name: Settings
     description: Application settings
   - name: Servers
@@ -25,6 +25,7 @@ components:
   schemas:
     Error:
       type: object
+      description: A server error
       properties:
         error:
           type: boolean
@@ -32,6 +33,7 @@ components:
           type: string
     UserCredentials:
       type: object
+      description: Credentials to authenticate with a user
       properties:
         username:
           type: string
@@ -41,12 +43,14 @@ components:
           example: 'mcmanager'
     AuthenticationToken:
       type: object
+      description: Bearer token representing the user authentication
       properties:
         accessToken:
           type: string
           example: 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjp7ImlzX2FkbWluIjp0cnVlLCJ1c2VybmFtZSI6ImFkbWluIiwiY3JlYXRlZF9hdCI6MTcyODA5NDk3My4zMzI3Mzk4LCJpZCI6IkM4OTQ0RTM4LUVGODQtNEU1RC1CNkVCLTMxN0Q4QUJGQ0YwNyIsInVwZGF0ZWRfYXQiOjE3MjgwOTQ5NzMuMzMyNzQxfSwiZXhwIjoxNzI4MTgyMTkzLjk4NDMxMiwic3ViIjoibWNtYW5hZ2VyIiwiaWF0IjoxNzI4MDk1NzkzLjk4NDMxMiwiaWQiOiJCOTU3MEVBNy00RkEzLTRBNTItOTU5Ni01RjdGQjFBQUMzN0QifQ.S6YUfHA8iuQ-RaSASI1MRO0lmIXpeV6-8ki2Xxgx-gQ'
     ApplicationSettings:
       type: object
+      description: MCManager application settings
       properties:
         serverStatusCacheTTLSeconds:
           type: integer
@@ -56,6 +60,7 @@ components:
           example: '1024-65535'
     ServerSupport:
       type: object
+      description: List of server types and versions that can be created with MCManager
       properties:
         type:
           type: string
@@ -65,6 +70,7 @@ components:
           example: ['1.21.1', '1.21', '1.20.6']
     ServerMetadata:
       type: object
+      description: Description of a Minecraft server
       properties:
         name:
           type: string
@@ -80,6 +86,7 @@ components:
           example: 25565
     Server:
       type: object
+      description: Description of a Minecraft server managed by MCManager
       properties:
         id:
           type: string
@@ -104,6 +111,7 @@ components:
           example: '2024-10-05T02:58:28Z'
     ServerInfo:
       type: object
+      description: Information about a Minecraft server runtime
       properties:
         status:
           type: string
@@ -114,6 +122,7 @@ components:
           example: true
     ServerStats:
       type: object
+      description: Usage statistics of a Minecraft server
       properties:
         cpuPercent:
           type: number
@@ -123,7 +132,7 @@ components:
           example: 536870912
     ServerProperties:
       type: object
-      description: Dictionary of all server properties
+      description: Minecraft server properties to configure the server runtime
       properties:
         allowFlight:
             type: boolean
@@ -306,7 +315,7 @@ paths:
                 example: 'AAAAB3NzaC1yc2EAAAADAQ...jYPbyCn6UraJ2p'
   /version:
     get:
-      summary: Get the version of the running app
+      summary: Get the version of MCManager
       tags: [Info]
       responses:
         '200':
@@ -323,7 +332,7 @@ paths:
         - AccessToken: []
       responses:
         '200':
-          description: Successful response
+          description: Fetched application settings
           content:
             application/json:
               schema:
@@ -347,6 +356,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApplicationSettings'
+        '401':
+          description: The current user lacks permissions to update the application settings
   /api/v1/servers/support:
     get:
       summary: Information about servers that can be created
@@ -401,6 +412,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Server'
+        '500':
+          description: Failed to create a new server
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/servers/{id}:
     get:
       summary: Fetch an existing server
@@ -421,7 +438,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Server'
         '404':
-          description: User not found
+          description: Server not found
     put:
       summary: Edit a server
       tags: [Servers]
@@ -441,6 +458,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Server'
+        '404':
+          description: Server not found
+        '500':
+          description: Failed to update server
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
     delete:
       summary: Edit a server
       tags: [Servers]
@@ -449,6 +474,20 @@ paths:
       responses:
         '200':
           description: Server successfully deleted
+        '400':
+          description: Can't delete the server
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Server not found
+        '500':
+          description: Failed to delete server
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/servers/{id}/info:
     get:
       summary: Fetch information about a server
@@ -468,6 +507,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ServerInfo'
+        '404':
+          description: Server not found
+        '500':
+          description: Failed to get server information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/servers/{id}/stats:
     get:
       summary: Fetch usage statistics about a server
@@ -487,6 +534,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ServerStats'
+        '404':
+          description: Server not found
+        '500':
+          description: Failed to get server statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/servers/properties:
     get:
       summary: Default values for the Minecraft server properties
@@ -519,6 +574,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ServerProperties'
+        '404':
+          description: Server not found
     put:
       summary: Update the Minecraft server properties
       tags: [Servers]
@@ -544,6 +601,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ServerProperties'
+        '404':
+          description: Server not found
+        '500':
+          description: Failed to update the server properties
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/servers/{id}/start:
     get:
       summary: Start a server
@@ -559,6 +624,8 @@ paths:
       responses:
         '200':
           description: Sent request to start the server
+        '404':
+          description: Server not found
         '500':
           description: Failed to start the server
           content:
@@ -580,6 +647,8 @@ paths:
       responses:
         '200':
           description: Sent request to stop the server
+        '404':
+          description: Server not found
         '500':
           description: Failed to stop the server
           content:
@@ -614,6 +683,14 @@ paths:
                   '[03:57:17] [Server thread/INFO]: Preparing start region for dimension minecraft:overworld',
                   '[03:57:18] [Worker-Main-5/INFO]: Preparing spawn area: 0%',
                 ]
+        '404':
+          description: Server not found
+        '500':
+          description: Failed to get the server logs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/servers/{id}/command:
     post:
       summary: Send a command to the server console
@@ -635,6 +712,8 @@ paths:
       responses:
         '200':
           description: Command sent
+        '404':
+          description: Server not found
         '500':
           description: Failed to send command
           content:
@@ -642,8 +721,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
   /api/v1/servers/{id}/files:
-    post:
-      summary: Browse server files at the given path (root path of the server by default)
+    get:
+      summary: Download a server file
       tags: [Servers]
       security:
         - AccessToken: []
@@ -655,22 +734,22 @@ paths:
           description: The server ID
         - in: query
           name: path
+          required: true
           type: string
-          description: Server path to browse
-      requestBody:
-        required: true
-        description: The server command to send
-        content:
-          text/plain:
-            example: '/weather clear'
+          description: Path of the file to download
       responses:
         '200':
-          description: List of files at the provided path
+          description: File downloaded successfully
+          content:
+            application/octect-stream: {}
+        '404':
+          description: Server not found
+        '500':
+          description: Failed to download the requested file
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/FileBrowser'
-  /api/v1/servers/{id}/files/upload:
+                $ref: '#/components/schemas/Error'
     post:
       summary: Upload a file to the server
       tags: [Servers]
@@ -705,7 +784,20 @@ paths:
       responses:
         '200':
           description: List of files at the provided path
-  /api/v1/servers/{id}/files/remove:
+        '400':
+          description: Can't upload the file to the server
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Server not found
+        '500':
+          description: Failed to upload file
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
     delete:
       summary: Delete a file on the server
       tags: [Servers]
@@ -725,9 +817,23 @@ paths:
       responses:
         '200':
           description: File deleted successfully
-  /api/v1/servers/{id}/files/download:
+        '400':
+          description: Can't remove the server file
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Server not found
+        '500':
+          description: Failed to remove the specified file
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/servers/{id}/files/browse:
     get:
-      summary: Download a server file
+      summary: Browse server files at the given path (root path of the server by default)
       tags: [Servers]
       security:
         - AccessToken: []
@@ -739,14 +845,29 @@ paths:
           description: The server ID
         - in: query
           name: path
-          required: true
           type: string
-          description: Path of the file to download
+          description: Server path to browse
+      requestBody:
+        required: true
+        description: The server command to send
+        content:
+          text/plain:
+            example: '/weather clear'
       responses:
         '200':
-          description: File downloaded successfully
+          description: List of files at the provided path
           content:
-            application/octect-stream: {}
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileBrowser'
+        '404':
+          description: Server not found
+        '500':
+          description: Failed to list the server files
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/servers/{id}/download:
     get:
       summary: Package and download a server for local use
@@ -764,6 +885,20 @@ paths:
           description: Server downloaded successfully
           content:
             application/octect-stream: {}
+        '400':
+          description: Can't download the server
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Server not found
+        '500':
+          description: Failed to download the server
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/users:
     get:
       summary: List all users
@@ -798,6 +933,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/User'
+        '400':
+          description: Can't create the new user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/users/{id}:
     get:
       summary: Get details about a user
@@ -844,6 +985,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/User'
+        '400':
+          description: Can't update the user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '404':
           description: User not found
     delete:
@@ -860,6 +1007,12 @@ paths:
       responses:
         '200':
           description: User deleted
+        '400':
+          description: Can't delete the user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '404':
           description: User not found
   /api/v1/users/profile:

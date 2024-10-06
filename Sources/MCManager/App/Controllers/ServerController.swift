@@ -27,8 +27,15 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
             .apiVersion(.v1)
             .grouped("servers")
         
+        // runtime support
+        servers.get("support", use: support)
+        // default properties
+        servers.get("properties", use: defaultProperties)
+        // list servers
         servers.get(use: all)
+        // create server
         servers.post(use: create)
+        // server operations
         servers.group(":serverID") { server in
             server.get(use: self.server(req:))
             server.put(use: update)
@@ -51,17 +58,12 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
             // files
             server.get("download", use: download)
             server.group("files") { files in
-                files.get(use: browseFiles)
-                files.on(.POST, "upload", body: .stream, use: uploadFile)
-                files.delete("remove", use: removeFile)
-                files.get("download", use: downloadFile)
+                files.get("browse", use: browseFiles)
+                files.get(use: downloadFile)
+                files.on(.POST, body: .stream, use: uploadFile)
+                files.delete(use: removeFile)
             }
         }
-        
-        // runtime support
-        servers.get("support", use: support)
-        // default properties
-        servers.get("properties", use: defaultProperties)
     }
     
     // MARK: - Server management
