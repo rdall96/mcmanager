@@ -43,11 +43,11 @@ extension MCServer {
         var viewDistance: MCInt?
         var whiteList: MCBool?
         
-        var dictionary: [String:Property?] {
-            var dictionary: [String : Property?] = [:]
+        var dictionary: [String : MCServerPropertyValue?] {
+            var dictionary: [String : MCServerPropertyValue?] = [:]
             Mirror(reflecting: self).children.forEach { child in
                 if let label = child.label {
-                    dictionary[label] = child.value as? Property
+                    dictionary[label] = child.value as? MCServerPropertyValue
                 }
             }
             return dictionary
@@ -88,12 +88,13 @@ extension MCServer {
     }
 }
 
+protocol MCServerPropertyValue: Codable {
+    var description: String { get }
+}
+
 extension MCServer.Properties {
-    protocol Property: Codable {
-        var description: String { get }
-    }
     
-    enum Difficulty: String, Property {
+    enum Difficulty: String, MCServerPropertyValue {
         case peaceful   // 0
         case easy       // 1
         case normal     // 2
@@ -102,7 +103,7 @@ extension MCServer.Properties {
         var description: String { rawValue }
     }
     
-    enum Gamemode: String, Property {
+    enum Gamemode: String, MCServerPropertyValue {
         case survival   // 0
         case creative   // 1
         case adventure  // 2
@@ -111,7 +112,7 @@ extension MCServer.Properties {
         var description: String { rawValue }
     }
     
-    enum MCBool: String, Property {
+    enum MCBool: String, MCServerPropertyValue {
         case `true`
         case `false`
         
@@ -130,13 +131,13 @@ extension MCServer.Properties {
         }
     }
     
-    struct MCString: RawRepresentable, Property {
+    struct MCString: RawRepresentable, MCServerPropertyValue {
         let rawValue: String
         
         var description: String { rawValue }
     }
     
-    struct MCInt: RawRepresentable, Property {
+    struct MCInt: RawRepresentable, MCServerPropertyValue {
         let rawValue: UInt
         
         init?(rawValue: UInt) {
