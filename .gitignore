@@ -7,3 +7,5 @@ DerivedData/
 data/
 .swiftpm
 .env
+api-spec/environments/*
+
