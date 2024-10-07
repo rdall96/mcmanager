@@ -39,12 +39,9 @@ struct UserController: MCManagerAPIRoute, RouteCollection {
         try requireAdmin(for: req)
         let userRequest = try req.content.decode(User.self)
         // This new user will now need its password encrypted before saving
-        let user = User(
-            username: userRequest.username,
-            password: try User.hashPassword(userRequest.password)
-        )
-        try await user.save(on: req.db)
-        return user
+        let newUser = try User(username: userRequest.username, password: userRequest.password)
+        try await newUser.save(on: req.db)
+        return newUser
     }
     
     
@@ -65,15 +62,7 @@ struct UserController: MCManagerAPIRoute, RouteCollection {
             throw Abort(.unauthorized)
         }
         let userRequest = try req.content.decode(User.self)
-        
-        // password
-        if !userRequest.password.isEmpty {
-            user.password = try User.hashPassword(userRequest.password)
-        }
-        
-        // update updatedAt time
-        user.updatedAt = .now
-        
+        try user.update(with: userRequest)
         try await user.save(on: req.db)
         return user
     }
@@ -93,8 +82,7 @@ struct UserController: MCManagerAPIRoute, RouteCollection {
         // delete existing user sessions
         try await SessionToken.query(on: req.db)
             .filter(\.$user.$id, .equal, try user.requireID())
-            .all()
-            .delete(on: req.db)
+            .delete()
         
         try await user.delete(on: req.db)
         

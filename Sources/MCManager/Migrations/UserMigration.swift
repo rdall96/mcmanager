@@ -10,7 +10,7 @@ import Fluent
 extension User {
     
     static var migrations: [AsyncMigration] {
-        [CreateTable()]
+        [CreateTable(), AddRole()]
     }
     
     struct CreateTable: AsyncMigration {
@@ -29,6 +29,20 @@ extension User {
         
         func revert(on database: Database) async throws {
             try await database.schema(User.schema).delete()
+        }
+    }
+    
+    struct AddRole: AsyncMigration {
+        func prepare(on database: any Database) async throws {
+            try await database.schema(User.schema)
+                .field(FieldKeys.roleID.rawValue, .uuid, .references(Role.schema, .id))
+                .update()
+        }
+        
+        func revert(on database: any Database) async throws {
+            try await database.schema(User.schema)
+                .deleteField(FieldKeys.roleID.rawValue)
+                .update()
         }
     }
 }

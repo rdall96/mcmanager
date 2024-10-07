@@ -20,7 +20,7 @@ extension SessionToken {
                 .field(SessionToken.FieldKeys.subject.rawValue, .string, .required)
                 .field(SessionToken.FieldKeys.issuedAt.rawValue, .datetime, .required)
                 .field(SessionToken.FieldKeys.expiresAt.rawValue, .datetime, .required)
-                .field(SessionToken.FieldKeys.userId.rawValue, .uuid, .references("users", "id"))
+                .field(SessionToken.FieldKeys.userId.rawValue, .uuid, .references(User.schema, .id))
                 .ignoreExisting()
                 .create()
         }

@@ -17,6 +17,7 @@ final class User: Model, Content {
         case createdAt = "created_at"
         case updatedAt = "updated_at"
         case adminPrivileges = "admin_privileges"
+        case roleID = "role_id"
     }
     
     private enum AdminPrivileges: UInt8, Codable {
@@ -46,6 +47,9 @@ final class User: Model, Content {
     @Field(key: FieldKeys.adminPrivileges.rawValue)
     private var adminPrivileges: AdminPrivileges
     
+    @OptionalParent(key: FieldKeys.roleID.rawValue)
+    var role: Role?
+    
     // MARK: - Initializers
     
     init() {}
@@ -53,15 +57,19 @@ final class User: Model, Content {
     init(
         username: String,
         password: String,
-        isAdmin: Bool? = nil
-    ) {
+        isAdmin: Bool? = nil,
+        role: Role? = nil
+    ) throws {
         self.id = UUID()
         self.username = username
-        self.password = password
+        self.password = try User.hashPassword(password)
         self.createdAt = .now
         self.updatedAt = .now
         self.adminPrivileges = (isAdmin ?? false) ? .admin : .none
+        self.$role.id = try role?.requireID()
     }
+    
+    // MARK: - Methods
     
     var isSuperAdmin: Bool {
         adminPrivileges == .superAdmin
@@ -69,6 +77,22 @@ final class User: Model, Content {
     
     var isAdmin: Bool {
         isSuperAdmin || adminPrivileges == .admin
+    }
+    
+    func update(with userRequest: User) throws {
+        if !userRequest.username.isEmpty {
+            username = userRequest.username
+        }
+        if !userRequest.password.isEmpty {
+            password = try User.hashPassword(userRequest.password)
+        }
+        
+        // some fields can't be updated for the admins
+        if !isAdmin {
+            $role.id = try userRequest.role?.requireID()
+        }
+        
+        updatedAt = .now
     }
     
     // MARK: - Codable
@@ -80,17 +104,26 @@ final class User: Model, Content {
         case createdAt
         case updatedAt
         case isAdmin
+        case role
     }
     
     // override decoding to set defaults so we can allow partial updates
     convenience init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init()
+        
         // we don't decode the id and the dates since those get updated internally
-        self.init(
-            username: try container.decodeIfPresent(String.self, forKey: .username) ?? "",
-            password: try container.decodeIfPresent(String.self, forKey: .password) ?? "",
-            isAdmin: try container.decodeIfPresent(Bool.self, forKey: .isAdmin)
-        )
+        id = nil
+        createdAt = .now
+        updatedAt = .now
+        
+        username = try container.decodeIfPresent(String.self, forKey: .username) ?? ""
+        password = try container.decodeIfPresent(String.self, forKey: .password) ?? ""
+        
+        let isAdmin = try container.decodeIfPresent(Bool.self, forKey: .isAdmin)
+        adminPrivileges = (isAdmin ?? false) ? .admin : .none
+        
+        $role.id = try container.decodeIfPresent(UUID.self, forKey: .role)
     }
     
     // override encoding since we want to omit the password field
@@ -101,6 +134,7 @@ final class User: Model, Content {
         try container.encode(createdAt, forKey: .createdAt)
         try container.encode(updatedAt, forKey: .updatedAt)
         try container.encode(isAdmin, forKey: .isAdmin)
+        try container.encode(try role?.requireID(), forKey: .role)
     }
 }
 
@@ -116,7 +150,7 @@ extension User: ModelCredentialsAuthenticatable {
 // MARK: Password hashing
 extension User {
     /// Hash the password
-    static func hashPassword(_ password: String) throws -> String {
+    fileprivate static func hashPassword(_ password: String) throws -> String {
         try Bcrypt.hash(password)
     }
 }
@@ -126,9 +160,9 @@ extension User {
     static var superAdminUsername: String { "admin" }
     
     static func createSuperAdmin(password: String) throws -> User {
-        let user = User(
+        let user = try User(
             username: superAdminUsername,
-            password: try hashPassword("mcmanager"),
+            password: "mcmanager",
             isAdmin: true
         )
         user.adminPrivileges = .superAdmin
