@@ -46,6 +46,7 @@ fileprivate struct API: MCManagerAPIRoute, RouteCollection {
     // Controllers
     let settingsController: SettingsController
     let userController: UserController
+    let roleController: RoleController
     let serverController: ServerController
     
     init(database: any Database) async throws {
@@ -59,6 +60,7 @@ fileprivate struct API: MCManagerAPIRoute, RouteCollection {
             }
         )
         userController = UserController(logger: logger)
+        roleController = RoleController(logger: logger)
         serverController = try await ServerController(
             serversPath: try DirectoryConfiguration.detect().serversPath,
             database: database,
@@ -71,6 +73,7 @@ fileprivate struct API: MCManagerAPIRoute, RouteCollection {
         
         try api.register(collection: settingsController)
         try api.register(collection: userController)
+        try api.register(collection: roleController)
         try api.register(collection: serverController)
     }
 }

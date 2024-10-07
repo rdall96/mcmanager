@@ -57,6 +57,7 @@ fileprivate func migrateDatabase(_ app: Application) async throws {
     // Add database migrations
     Settings.migrations.forEach { app.migrations.add($0) }
     User.migrations.forEach { app.migrations.add($0) }
+    Role.migrations.forEach { app.migrations.add($0) }
     SessionToken.migrations.forEach { app.migrations.add($0) }
     MCServer.migrations.forEach { app.migrations.add($0) }
     ServerStatusCache.migrations.forEach { app.migrations.add($0) }
