@@ -1,0 +1,23 @@
+meta {
+  name: Edit User
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{base_url}}/api/v1/users/{{user_id}}
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+      "password": "mcmanager"
+  }
+}
+
+script:pre-request {
+  if (bru.getEnvVar("user_id") == "") {
+    throw "Missing user ID";
+  }
+}

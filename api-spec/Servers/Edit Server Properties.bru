@@ -1,0 +1,26 @@
+meta {
+  name: Edit Server Properties
+  type: http
+  seq: 11
+}
+
+put {
+  url: {{base_url}}/api/v1/servers/{{server_id}}/properties
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+      "difficulty": "normal",
+      "motd": "MCManager QA tests",
+      "spawnProtection": 0,
+      "viewDistance": 2
+  }
+}
+
+script:pre-request {
+  if (bru.getEnvVar("server_id") == "") {
+    throw "Missing server ID";
+  }
+}

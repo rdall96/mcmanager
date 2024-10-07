@@ -1,0 +1,17 @@
+meta {
+  name: Server Info
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{base_url}}/api/v1/servers/{{server_id}}/info
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (bru.getEnvVar("server_id") == "") {
+    throw "Missing server ID";
+  }
+}

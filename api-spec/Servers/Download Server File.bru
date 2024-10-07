@@ -1,0 +1,24 @@
+meta {
+  name: Download Server File
+  type: http
+  seq: 18
+}
+
+get {
+  url: {{base_url}}/api/v1/servers/{{server_id}}/files?path=icon.png
+  body: none
+  auth: inherit
+}
+
+params:query {
+  path: icon.png
+  ~path: configurations/README.txt
+  ~path: mods
+  ~path: world
+}
+
+script:pre-request {
+  if (bru.getEnvVar("server_id") == "") {
+    throw "Missing server ID";
+  }
+}

@@ -1,0 +1,26 @@
+meta {
+  name: Create Server
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{base_url}}/api/v1/servers
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+      "name": "Test Server",
+      "type": "java",
+      "version": "1.21.1",
+      "port": 25565
+  }
+}
+
+script:post-response {
+  if (res.status == 200) {
+    bru.setEnvVar("server_id", res.body.id);
+  }
+}
