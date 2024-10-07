@@ -170,6 +170,21 @@ final class MCServerOrchestra {
     
     // MARK: - Execution
     
+    var runningServersCount: UInt {
+        get async {
+            await withTaskGroup(of: Bool.self, returning: UInt.self) { group in
+                serverRuntimes.values.forEach { server in
+                    group.addTask { await server.isRunning }
+                }
+                var count: UInt = 0
+                while let result = await group.next() {
+                    count += result ? 1 : 0
+                }
+                return count
+            }
+        }
+    }
+    
     /// Start a server
     func startServer(with serverID: UUID) async throws {
         let server = try requireServer(id: serverID)

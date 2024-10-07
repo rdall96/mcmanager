@@ -215,6 +215,10 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
     
     func start(req: Request) async throws -> HTTPStatus {
         let serverID = try req.serverID
+        let settings = try await settings(on: req.db)
+        guard await orchestra.runningServersCount < settings.maxRunningServers else {
+            throw Abort(.serviceUnavailable, reason: "Reached maximum number of running servers")
+        }
         try await orchestra.startServer(with: serverID)
         // invalidate the status cache
         try await ServerStatusCache.find(serverID, on: req.db)?.delete(on: req.db)
@@ -330,7 +334,7 @@ extension ServerController {
     
     // Fetch the most up-to-date service settings
     func settings(on database: Database) async throws -> Settings {
-        try await Settings.query(on: database).all().first ?? .defaults
+        try await Settings.query(on: database).first() ?? .defaults
     }
     
     /// Load all existing servers from the given database into the current runtime

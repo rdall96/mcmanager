@@ -101,9 +101,7 @@ final actor ServerRuntime: Identifiable {
     
     /// Delete the server
     func delete() async throws {
-        if await isRunning {
-            throw MCServerError.serverIsRunning
-        }
+        try await ensureIsStopped()
         do {
             // remove the container
             try await Docker.remove(container: process, force: true)
@@ -181,9 +179,7 @@ final actor ServerRuntime: Identifiable {
     }
     
     nonisolated func removeFile(at relativePath: String) async throws {
-        if await isRunning {
-            throw MCServerError.serverIsRunning
-        }
+        try await ensureIsStopped()
         do {
             try FileManager.default.removeItem(at: path.appendingPathComponent(relativePath))
         }
@@ -214,7 +210,7 @@ final actor ServerRuntime: Identifiable {
             dockerStatus = .unknown
         }
         if case .running = dockerStatus {
-            let logs = (try? await logs()) ?? []
+            let logs = (try? await logs().reversed()) ?? []
             status = MCServer.Status.latestStatus(in: logs.joined(separator: "\n"))
         }
         else {
@@ -238,6 +234,12 @@ final actor ServerRuntime: Identifiable {
     private func ensureIsRunning() async throws {
         if !(await isRunning) {
             throw MCServerError.executionError("The server is not running")
+        }
+    }
+    
+    private func ensureIsStopped() async throws {
+        if await isRunning {
+            throw MCServerError.serverIsRunning
         }
     }
     
@@ -300,9 +302,7 @@ final actor ServerRuntime: Identifiable {
     
     /// Start the server
     func start() async throws {
-        if await isRunning {
-            throw MCServerError.serverIsRunning
-        }
+        try await ensureIsStopped()
         
         // Ensure the server runtime (process) is the most up to date version by checking the internal
         // member processNeedsUpdate and create a new container of necessary
