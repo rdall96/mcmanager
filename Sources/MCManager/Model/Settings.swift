@@ -14,6 +14,7 @@ final class Settings: Model, Content {
     enum FieldKeys: FieldKey {
         case serverStatusCacheTTLSeconds = "server_status_cache_ttl_seconds"
         case allowedServerPorts = "allowed_server_ports"
+        case maxRunningServers = "max_running_servers"
     }
     
     @ID(key: .id)
@@ -33,15 +34,21 @@ final class Settings: Model, Content {
     /// Note: Ports outside of the follwoing range will be automatically discarded as they are either invalid or reserved: 1024-65535
     var allowedServerPorts: String
     
+    @Field(key: FieldKeys.maxRunningServers.rawValue)
+    /// The maximum number of concurrently running servers
+    var maxRunningServers: UInt
+    
     init() {}
     
     convenience init(
         serverStatusCacheTTLSeconds: UInt,
-        allowedServerPorts: String
+        allowedServerPorts: String,
+        maxRunningServers: UInt
     ) {
         self.init()
         self.serverStatusCacheTTLSeconds = serverStatusCacheTTLSeconds
         self.allowedServerPorts = allowedServerPorts.replacingOccurrences(of: " ", with: "")
+        self.maxRunningServers = maxRunningServers
     }
     
     var allowedServerPortsData: Set<UInt16> {
@@ -68,6 +75,7 @@ final class Settings: Model, Content {
     private enum CodingKeys: String, CodingKey {
         case serverStatusCacheTTLSeconds
         case allowedServerPorts
+        case maxRunningServers
     }
     
     // override decoding to ensure we do type checking
@@ -75,7 +83,8 @@ final class Settings: Model, Content {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.init(
             serverStatusCacheTTLSeconds: try container.decode(UInt.self, forKey: .serverStatusCacheTTLSeconds),
-            allowedServerPorts: try container.decode(String.self, forKey: .allowedServerPorts)
+            allowedServerPorts: try container.decode(String.self, forKey: .allowedServerPorts),
+            maxRunningServers: try container.decode(UInt.self, forKey: .maxRunningServers)
         )
     }
     
@@ -84,6 +93,7 @@ final class Settings: Model, Content {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(serverStatusCacheTTLSeconds, forKey: .serverStatusCacheTTLSeconds)
         try container.encode(allowedServerPorts, forKey: .allowedServerPorts)
+        try container.encode(maxRunningServers, forKey: .maxRunningServers)
     }
 }
 
@@ -94,7 +104,8 @@ extension Settings {
     static var defaults: Settings {
         .init(
             serverStatusCacheTTLSeconds: 5,
-            allowedServerPorts: "\(Settings.validPortRange.lowerBound)-\(Settings.validPortRange.upperBound)"
+            allowedServerPorts: "\(Settings.validPortRange.lowerBound)-\(Settings.validPortRange.upperBound)",
+            maxRunningServers: 10
         )
     }
     

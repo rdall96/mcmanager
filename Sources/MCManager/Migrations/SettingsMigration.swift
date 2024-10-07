@@ -10,7 +10,7 @@ import Fluent
 extension Settings {
     
     static var migrations: [AsyncMigration] {
-        [CreateTable()]
+        [CreateTable(), MigrateToV2()]
     }
     
     struct CreateTable: AsyncMigration {
@@ -25,6 +25,25 @@ extension Settings {
         
         func revert(on database: Database) async throws {
             try await database.schema(Settings.schema).delete()
+        }
+    }
+    
+    struct MigrateToV2: AsyncMigration {
+        func prepare(on database: any Database) async throws {
+            try await database.schema(Settings.schema)
+                .field(
+                    Settings.FieldKeys.maxRunningServers.rawValue,
+                    .uint,
+                    .required,
+                    .sql(.default(Settings.defaults.maxRunningServers))
+                )
+                .update()
+        }
+        
+        func revert(on database: any Database) async throws {
+            try await database.schema(Settings.schema)
+                .deleteField(Settings.FieldKeys.maxRunningServers.rawValue)
+                .update()
         }
     }
 }
