@@ -4,10 +4,15 @@ import FluentSQLiteDriver
 import JWT
 import Vapor
 
+fileprivate let applicationHTTPPort: Int = 3000
+
 // configures your application
 public func configure(_ app: Application) async throws {
     // uncomment to serve files from /Public folder
     // app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
+    
+    // Application port
+    app.http.server.configuration.port = applicationHTTPPort
     
     // Password encryption
     app.passwords.use(.bcrypt(cost: 16))
@@ -109,8 +114,8 @@ fileprivate func addCorsMiddleware(to app: Application) {
 extension CORSMiddleware.AllowOriginSetting {
     static var defaultFrontend: Self {
         .any([
-            "127.0.0.1:3000",
-            "http://localhost:3000"
+            "127.0.0.1:\(applicationHTTPPort)",
+            "http://localhost:\(applicationHTTPPort)"
         ])
     }
 }
