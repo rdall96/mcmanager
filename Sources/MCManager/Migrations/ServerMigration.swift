@@ -8,7 +8,12 @@
 import Fluent
 
 extension MCServer {
-    struct Migration: AsyncMigration {
+    
+    static var migrations: [AsyncMigration] {
+        [CreateTable()]
+    }
+    
+    struct CreateTable: AsyncMigration {
         func prepare(on database: Database) async throws {
             try await database.schema(MCServer.schema)
                 .id()

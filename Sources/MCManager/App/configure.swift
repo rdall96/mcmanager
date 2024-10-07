@@ -55,11 +55,11 @@ fileprivate func connectDatabase(_ app: Application) throws {
 
 fileprivate func migrateDatabase(_ app: Application) async throws {
     // Add database migrations
-    app.migrations.add(Settings.Migration())
-    app.migrations.add(User.Migration())
-    app.migrations.add(SessionToken.Migration())
-    app.migrations.add(MCServer.Migration())
-    app.migrations.add(ServerStatusCache.Migration())
+    Settings.migrations.forEach { app.migrations.add($0) }
+    User.migrations.forEach { app.migrations.add($0) }
+    SessionToken.migrations.forEach { app.migrations.add($0) }
+    MCServer.migrations.forEach { app.migrations.add($0) }
+    ServerStatusCache.migrations.forEach { app.migrations.add($0) }
     
     // Migrate database
     try await app.autoMigrate()
