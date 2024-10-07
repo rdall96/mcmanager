@@ -11,6 +11,9 @@ public func configure(_ app: Application) async throws {
     // uncomment to serve files from /Public folder
     // app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
     
+    // Server name
+    app.http.server.configuration.serverName = "MCManager"
+    
     // Application port
     app.http.server.configuration.port = applicationHTTPPort
     
