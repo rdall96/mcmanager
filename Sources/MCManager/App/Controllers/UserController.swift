@@ -74,7 +74,7 @@ struct UserController: MCManagerAPIRoute, RouteCollection {
             throw Abort(.unauthorized)
         }
         // the superuser cannot be deleted
-        guard !user.isSuperAdmin else {
+        if user.isSuperAdmin {
             logger.error("Attempted to delete default admin user, operation not allowed")
             throw Abort(.forbidden, reason: "The admin user cannot be deleted")
         }

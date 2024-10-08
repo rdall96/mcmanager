@@ -79,17 +79,17 @@ final class User: Model, Content {
         isSuperAdmin || adminPrivileges == .admin
     }
     
-    func update(with userRequest: User) throws {
-        if !userRequest.username.isEmpty {
-            username = userRequest.username
+    func update(with request: User) throws {
+        if !request.username.isEmpty {
+            username = request.username
         }
-        if !userRequest.password.isEmpty {
-            password = try User.hashPassword(userRequest.password)
+        if !request.password.isEmpty {
+            password = try User.hashPassword(request.password)
         }
         
         // some fields can't be updated for the admins
         if !isAdmin {
-            $role.id = try userRequest.role?.requireID()
+            $role.id = request.$role.id
         }
         
         updatedAt = .now
@@ -134,7 +134,7 @@ final class User: Model, Content {
         try container.encode(createdAt, forKey: .createdAt)
         try container.encode(updatedAt, forKey: .updatedAt)
         try container.encode(isAdmin, forKey: .isAdmin)
-        try container.encode(try role?.requireID(), forKey: .role)
+        try container.encode($role.id, forKey: .role)
     }
 }
 
