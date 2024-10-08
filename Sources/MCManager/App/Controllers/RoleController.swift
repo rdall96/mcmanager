@@ -22,6 +22,8 @@ struct RoleController: MCManagerAPIRoute, RouteCollection {
             role.get(use: self.role)
             role.put(use: update)
             role.delete(use: delete)
+            
+            role.get("members", use: members)
         }
     }
     
@@ -63,6 +65,13 @@ struct RoleController: MCManagerAPIRoute, RouteCollection {
         }
         try await role.delete(on: req.db)
         return .noContent
+    }
+    
+    func members(req: Request) async throws -> [User] {
+        let role = try await req.role
+        return try await User.query(on: req.db)
+            .filter(\.$role.$id, .equal, try role.requireID())
+            .all()
     }
 }
 

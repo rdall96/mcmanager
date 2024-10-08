@@ -1145,3 +1145,26 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           description: Role not found
+  /api/v1/roles/{id}/members:
+    get:
+      summary: Fetch all members of this user role
+      tags: [Roles]
+      security:
+        - AccessToken: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          type: string
+          description: The role ID
+      responses:
+        '200':
+          description: Fetched all members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '404':
+          description: Role not found
