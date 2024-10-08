@@ -16,6 +16,8 @@ tags:
     description: Interact with Minecraft servers
   - name: Users
     description: User operations
+  - name: Roles
+    description: User roles to manage groups of users
 components:
   securitySchemes:
     AccessToken:
@@ -261,6 +263,25 @@ components:
         isAdmin:
           type: boolean
           example: false
+        createdAt:
+          type: string
+          example: '2024-10-05T04:20:42Z'
+        updatedAt:
+          type: string
+          example: '2024-10-05T04:20:42Z'
+        role:
+          type: string
+          example: 'E18DE084-C565-4059-8DD5-1AE50E997CD1'
+    Role:
+      type: object
+      description: Information about a user roles
+      properties:
+        id:
+          type: string
+          example: 'E18DE084-C565-4059-8DD5-1AE50E997CD1'
+        name:
+          type: string
+          example 'Default'
         createdAt:
           type: string
           example: '2024-10-05T04:20:42Z'
@@ -1028,3 +1049,99 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/User'
+  /api/v1/roles:
+    get:
+      summary: List all the user roles
+      tags: [Roles]
+      security:
+        - AccessToken: []
+      responses:
+        '200':
+          description: Fetched user roles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Role'
+    post:
+      summary: Create a new user role
+      tags: [Roles]
+      security:
+        - AccessToken: []
+      requestBody:
+        required: true
+        description: Details to create the role
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Role'
+      responses:
+        '200':
+          description: User roles created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+        '400':
+          description: Can't create the role
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/roles/{id}:
+    put:
+      summary: Update user role
+      tags: [Roles]
+      security:
+        - AccessToken: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          type: string
+          description: The role ID
+      requestBody:
+        required: true
+        description: Details to update on the role
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Role'
+      responses:
+        '200':
+          description: Updated user role
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+        '400':
+          description: Can't update the role
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Role not found
+    delete:
+      summary: Delete user role
+      tags: [Roles]
+      security:
+        - AccessToken: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          type: string
+          description: The role ID
+      responses:
+        '200':
+          description: Deleted role
+        '400':
+          description: Can't delete the role
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Role not found
