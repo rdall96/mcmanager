@@ -10,7 +10,7 @@ import Fluent
 extension Role {
     
     static var migrations: [AsyncMigration] {
-        [CreateTable()]
+        [CreateTable(), AddPermissions()]
     }
     
     struct CreateTable: AsyncMigration {
@@ -27,6 +27,20 @@ extension Role {
         
         func revert(on database: any Database) async throws {
             try await database.schema(Role.schema).delete()
+        }
+    }
+    
+    struct AddPermissions: AsyncMigration {
+        func prepare(on database: any Database) async throws {
+            try await database.schema(Role.schema)
+                .field(FieldKeys.permissions.rawValue, .data)
+                .update()
+        }
+        
+        func revert(on database: any Database) async throws {
+            try await database.schema(Role.schema)
+                .deleteField(FieldKeys.permissions.rawValue)
+                .update()
         }
     }
 }

@@ -56,11 +56,11 @@ struct RoleController: MCManagerAPIRoute, RouteCollection {
     func delete(req: Request) async throws -> HTTPStatus {
         let role = try await req.role
         // Ensure there are no users with this role, otherwise this would cause a permission havoc
-        let roleIsInUse = try await User.query(on: req.db)
+        let roleIsUnused = try await User.query(on: req.db)
             .filter(\.$role.$id, .equal, try role.requireID())
             .all()
             .isEmpty
-        if roleIsInUse {
+        guard roleIsUnused else {
             throw Abort(.notAcceptable, reason: "There are still users with this role")
         }
         try await role.delete(on: req.db)
