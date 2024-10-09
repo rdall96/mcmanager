@@ -59,6 +59,12 @@ struct Permissions: Codable {
         users: Users.readUsers,
         servers: Servers(rawValue: .max)
     )
+    
+    static let all = Permissions(
+        application: .init(rawValue: .max),
+        users: .init(rawValue: .max),
+        servers: .init(rawValue: .max)
+    )
 }
 
 //struct PermissionResponse {

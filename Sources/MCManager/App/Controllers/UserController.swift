@@ -30,13 +30,17 @@ struct UserController: MCManagerAPIRoute, RouteCollection {
 
     /// List all users
     func all(req: Request) async throws -> [User] {
-        try await User.query(on: req.db).all()
+        guard try await req.userHasPermissions(for: .readUsers) else {
+            throw Abort(.unauthorized)
+        }
+        return try await User.query(on: req.db).all()
     }
 
     /// Create a new user
     func create(req: Request) async throws -> User {
-        // Only admins can create new users
-        try requireAdmin(for: req)
+        guard try await req.userHasPermissions(for: .createUsers) else {
+            throw Abort(.unauthorized)
+        }
         let userRequest = try req.content.decode(User.self)
         // This new user will now need its password encrypted before saving
         let newUser = try User(username: userRequest.username, password: userRequest.password)
@@ -47,7 +51,12 @@ struct UserController: MCManagerAPIRoute, RouteCollection {
     
     /// Get info for a specific user
     func user(req: Request) async throws -> User {
-        try await req.user
+        let user = try await req.user
+        let hasPermissions = try await req.userHasPermissions(for: .readUsers)
+        guard try user.isCurrentUser(for: req) || hasPermissions else {
+            throw Abort(.unauthorized)
+        }
+        return user
     }
     
     /// Get infor for the current signed-in user
@@ -58,9 +67,17 @@ struct UserController: MCManagerAPIRoute, RouteCollection {
     /// Update info for a user
     func update(req: Request) async throws -> User {
         let user = try await req.user
-        guard try user.hasEditPermissions(for: req) else {
+        let hasPermissions = try await req.userHasPermissions(for: .editUsers)
+        guard try user.isCurrentUser(for: req) || hasPermissions else {
             throw Abort(.unauthorized)
         }
+        
+        // only the super admin can edit itself
+        if user.isSuperAdmin, !(try user.isCurrentUser(for: req)) {
+            logger.error("Attempted to edit the super admin, operation not allowed")
+            throw Abort(.forbidden, reason: "Only the super admin can edit itself")
+        }
+        
         let userRequest = try req.content.decode(User.self)
         try user.update(with: userRequest)
         try await user.save(on: req.db)
@@ -70,13 +87,14 @@ struct UserController: MCManagerAPIRoute, RouteCollection {
     /// Delete a user
     func delete(req: Request) async throws -> HTTPStatus {
         let user = try await req.user
-        guard try user.hasEditPermissions(for: req) else {
+        let hasPermissions = try await req.userHasPermissions(for: .deleteUsers)
+        guard try user.isCurrentUser(for: req) || hasPermissions else {
             throw Abort(.unauthorized)
         }
         // the superuser cannot be deleted
         if user.isSuperAdmin {
             logger.error("Attempted to delete default admin user, operation not allowed")
-            throw Abort(.forbidden, reason: "The admin user cannot be deleted")
+            throw Abort(.forbidden, reason: "The super admin user cannot be deleted")
         }
         
         // delete existing user sessions
@@ -93,9 +111,21 @@ struct UserController: MCManagerAPIRoute, RouteCollection {
 // MARK: - Helpers
 
 fileprivate extension Request {
+    
+    var userID: UUID {
+        get throws {
+            guard let id = self.parameters.get("userID"),
+                  let uuid = UUID(uuidString: id)
+            else {
+                throw Abort(.badRequest, reason: "Missing user ID in request path")
+            }
+            return uuid
+        }
+    }
+    
     var user: User {
         get async throws {
-            let user = try await User.find(self.parameters.get("userID"), on: self.db)
+            let user = try await User.find(try userID, on: self.db)
             guard let user else {
                 throw Abort(.notFound, reason: "The requested user does not exist")
             }
@@ -111,9 +141,8 @@ fileprivate extension Request {
 }
 
 fileprivate extension User {
-    func hasEditPermissions(for req: Request) throws -> Bool {
-        // only self (the current user) or an admin can edit the user
+    func isCurrentUser(for req: Request) throws -> Bool {
         let currentUser = try req.currentUser
-        return currentUser.id == self.id || currentUser.isAdmin
+        return try requireID() == currentUser.id
     }
 }

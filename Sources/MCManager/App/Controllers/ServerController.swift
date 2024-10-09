@@ -365,7 +365,7 @@ fileprivate extension Request {
             guard let id = self.parameters.get("serverID"),
                   let uuid = UUID(uuidString: id)
             else {
-                throw Abort(.notFound, reason: "Missing server ID in request path")
+                throw Abort(.badRequest, reason: "Missing server ID in request path")
             }
             return uuid
         }
@@ -373,7 +373,7 @@ fileprivate extension Request {
     
     var server: MCServer {
         get async throws {
-            guard let server = try await MCServer.find(try self.serverID, on: self.db) else {
+            guard let server = try await MCServer.find(try serverID, on: self.db) else {
                 throw Abort(.notFound, reason: "The requested server does not exist")
             }
             return server
