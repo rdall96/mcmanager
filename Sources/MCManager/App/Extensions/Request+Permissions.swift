@@ -22,7 +22,10 @@ extension Request {
             guard let roleID = user.$role.id else {
                 return nil
             }
-            return try await Role.find(roleID, on: db)?.permissions
+            let permissions = try await Role.find(roleID, on: db)?.permissions
+            
+            // users without an assigned role, get default permissions
+            return permissions ?? .defaults
         }
     }
     

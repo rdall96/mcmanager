@@ -38,7 +38,7 @@ struct Permissions: Codable {
         
         // server properties
         static let readServerProperties =   Servers(rawValue: 1 << 3)
-        static let writeServerProperties =  Servers(rawValue: 1 << 4)
+        static let editServerProperties =  Servers(rawValue: 1 << 4)
         
         // execution
         static let startStopServers =       Servers(rawValue: 1 << 5)
@@ -55,7 +55,12 @@ struct Permissions: Codable {
     static let defaults = Permissions(
         application: .readSettings,
         users: .readUsers,
-        servers: Servers(rawValue: .max)
+        servers: [
+            .createServers, .editServers, .deleteServers,
+            .readServerProperties, .editServerProperties,
+            .startStopServers, .readServerLogs,
+            .downloadServerFiles, .uploadServerFiles, .deleteServerFiles
+        ]
     )
     
     static let all = Permissions(
