@@ -12,7 +12,7 @@ import Logging
 /**
  The orchestra is an object that manages all the server runtimes on the current host
  */
-final class MCServerOrchestra {
+final class MCServerManager {
     
     private let serversRoot: URL
     private let logger: Logger

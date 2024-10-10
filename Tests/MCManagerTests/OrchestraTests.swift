@@ -10,7 +10,7 @@ import XCTest
 
 final class OrchestraTests: XCTestCase {
     
-    var orchestra: MCServerOrchestra!
+    var orchestra: MCServerManager!
     
     override func setUp() async throws {
         orchestra = try .init(serversRoot: FileManager.default.temporaryDirectory)

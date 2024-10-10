@@ -11,10 +11,10 @@ import Vapor
 struct ServerController: MCManagerAPIRoute, RouteCollection {
     
     let logger: Logger
-    let orchestra: MCServerOrchestra
+    let manager: MCServerManager
     
     init(serversPath: URL, database: any Database, logger: Logger) async throws {
-        self.orchestra = try .init(serversRoot: serversPath, logger: logger)
+        self.manager = try .init(serversRoot: serversPath, logger: logger)
         self.logger = logger
         
         try await loadExistingServers(from: database)
@@ -95,7 +95,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         try await ensureIsValid(server: server, on: req.db)
         try await server.save(on: req.db)
         do {
-            try await orchestra.add(server: server)
+            try await manager.add(server: server)
         }
         catch {
             logger.critical("Failed to create server: \(error)")
@@ -129,7 +129,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         
         try await ensureIsValid(server: server, on: req.db)
         try await server.save(on: req.db)
-        try await orchestra.update(server: server)
+        try await manager.update(server: server)
         return server
     }
     
@@ -142,7 +142,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         
         try await server.delete(on: req.db)
         do {
-            try await orchestra.deleteServer(id: serverID)
+            try await manager.deleteServer(id: serverID)
         }
         catch {
             logger.critical("Failed to delete server from disk, attempting to restore it")
@@ -160,7 +160,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         guard try await req.userHasPermissions(for: .createServers) else {
             throw Abort(.unauthorized)
         }
-        return try await orchestra.allSupportedRuntimes
+        return try await manager.allSupportedRuntimes
     }
     
     // MARK: - Status
@@ -181,8 +181,8 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
             let status = ServerStatusCache(
                 id: serverID,
                 ttl: settings.serverStatusCacheTTLSeconds,
-                info: try await orchestra.info(for: serverID),
-                stats: try await orchestra.stats(for: serverID)
+                info: try await manager.info(for: serverID),
+                stats: try await manager.stats(for: serverID)
             )
             try await status.save(on: database)
             return status
@@ -192,7 +192,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
     func info(req: Request) async throws -> MCServer.Info {
         let serverID = try req.serverID
         guard let info = try await serverStatus(for: serverID, on: req.db)?.info else {
-            return try await orchestra.info(for: serverID)
+            return try await manager.info(for: serverID)
         }
         return info
     }
@@ -200,7 +200,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
     func stats(req: Request) async throws -> MCServer.Stats {
         let serverID = try req.serverID
         guard let metrics = try await serverStatus(for: serverID, on: req.db)?.stats else {
-            return try await orchestra.stats(for: serverID)
+            return try await manager.stats(for: serverID)
         }
         return metrics
     }
@@ -219,7 +219,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
             throw Abort(.unauthorized)
         }
         let serverID = try req.serverID
-        return try await orchestra.properties(for: serverID)
+        return try await manager.properties(for: serverID)
     }
     
     func updateProperties(req: Request) async throws -> HTTPStatus {
@@ -228,7 +228,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         }
         let serverID = try req.serverID
         let properties = try req.content.decode(MCServer.Properties.self)
-        try await orchestra.updateProperties(properties, for: serverID)
+        try await manager.updateProperties(properties, for: serverID)
         return .ok
     }
     
@@ -240,10 +240,10 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         }
         let serverID = try req.serverID
         let settings = try await settings(on: req.db)
-        guard await orchestra.runningServersCount < settings.maxRunningServers else {
+        guard await manager.runningServersCount < settings.maxRunningServers else {
             throw Abort(.serviceUnavailable, reason: "Reached maximum number of running servers")
         }
-        try await orchestra.startServer(with: serverID)
+        try await manager.startServer(with: serverID)
         // invalidate the status cache
         try await ServerStatusCache.find(serverID, on: req.db)?.delete(on: req.db)
         return .ok
@@ -254,7 +254,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
             throw Abort(.unauthorized)
         }
         let serverID = try req.serverID
-        try await orchestra.stopServer(with: serverID)
+        try await manager.stopServer(with: serverID)
         // invalidate the status cache
         try await ServerStatusCache.find(serverID, on: req.db)?.delete(on: req.db)
         return .ok
@@ -268,7 +268,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         guard let command = try? req.content.decode(String.self) else {
             throw Abort(.badRequest, reason: "Missing command in request body")
         }
-        try await orchestra.sendCommand(command, to: serverID)
+        try await manager.sendCommand(command, to: serverID)
         return .ok
     }
     
@@ -281,7 +281,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         if let tailValue = req.query[UInt.self, at: "tail"] {
             tail = UInt(tailValue)
         }
-        return try await orchestra.logs(for: serverID, tail: tail)
+        return try await manager.logs(for: serverID, tail: tail)
     }
     
     // MARK: - File management
@@ -293,7 +293,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         let serverID = try req.serverID
         let fileURL: URL
         do {
-            fileURL = try await orchestra.downloadServer(with: serverID)
+            fileURL = try await manager.downloadServer(with: serverID)
         }
         catch MCServerError.invalidServerId {
             throw Abort(.notFound, reason: "The requested server does not exist")
@@ -306,12 +306,12 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
     func browseFiles(req: Request) async throws -> FileBrowser {
         let serverID = try req.serverID
         let relativePath = req.query[String.self, at: "path"]
-        if try await orchestra.file(at: relativePath ?? "", from: serverID) == nil {
+        if try await manager.file(at: relativePath ?? "", from: serverID) == nil {
             throw Abort(.notFound)
         }
         return FileBrowser(
             relativePath: relativePath,
-            files: try await orchestra.listFiles(at: relativePath, for: serverID)
+            files: try await manager.listFiles(at: relativePath, for: serverID)
         )
     }
     
@@ -333,7 +333,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
             throw Abort(.internalServerError, reason: "Failed to upload file")
         }
         
-        try await orchestra.saveFile(
+        try await manager.saveFile(
             at: uploadedFileURL,
             for: serverID,
             to: metadata.filePath
@@ -350,10 +350,10 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         guard let relativePath = req.query[String.self, at: "path"] else {
             throw Abort(.badRequest, reason: "Missing file path to remove in request query")
         }
-        if try await orchestra.file(at: relativePath, from: serverID) == nil {
+        if try await manager.file(at: relativePath, from: serverID) == nil {
             throw Abort(.notFound, reason: "The specified file path does not exist")
         }
-        try await orchestra.removeFile(at: relativePath, for: serverID)
+        try await manager.removeFile(at: relativePath, for: serverID)
         return .ok
     }
     
@@ -365,7 +365,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         guard let relativePath = req.query[String.self, at: "path"] else {
             throw Abort(.badRequest, reason: "Missing path of file to download in request query")
         }
-        guard let fileURL = try await orchestra.file(at: relativePath, from: serverID) else {
+        guard let fileURL = try await manager.file(at: relativePath, from: serverID) else {
             throw Abort(.notFound, reason: "The specified file path does not exist")
         }
         
@@ -388,7 +388,7 @@ extension ServerController {
         let servers = try await MCServer.query(on: database).all()
         logger.notice("Found \(servers.count) existing server(s)")
         for server in servers {
-            try await orchestra.add(server: server)
+            try await manager.add(server: server)
         }
     }
     
