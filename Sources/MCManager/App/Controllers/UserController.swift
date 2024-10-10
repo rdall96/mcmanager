@@ -44,8 +44,17 @@ struct UserController: MCManagerAPIRoute, RouteCollection {
             throw Abort(.unauthorized)
         }
         let userRequest = try req.content.decode(User.self)
+        // only admins can create other admins
+        if userRequest.isAdmin, !(try req.currentUser.isAdmin) {
+            throw Abort(.forbidden, reason: "Only admins can create other admins")
+        }
         // This new user will now need its password encrypted before saving
-        let newUser = try User(username: userRequest.username, password: userRequest.password)
+        let newUser = try User(
+            username: userRequest.username,
+            password: userRequest.password,
+            isAdmin: userRequest.isAdmin,
+            roleID: userRequest.$role.id
+        )
         try await newUser.save(on: req.db)
         return newUser
     }
@@ -75,9 +84,8 @@ struct UserController: MCManagerAPIRoute, RouteCollection {
         }
         
         // only the super admin can edit itself
-        if user.isSuperAdmin, !(try user.isCurrentUser(for: req)) {
-            logger.error("Attempted to edit the super admin, operation not allowed")
-            throw Abort(.forbidden, reason: "Only the super admin can edit itself")
+        if user.isAdmin, !(try user.isCurrentUser(for: req)), !(try req.currentUser.isSuperAdmin) {
+            throw Abort(.forbidden, reason: "You can't edit an admin user")
         }
         
         let userRequest = try req.content.decode(User.self)
@@ -111,6 +119,10 @@ struct UserController: MCManagerAPIRoute, RouteCollection {
     
     func role(req: Request) async throws -> Role {
         let user = try await req.user
+        let hasPermissions = try await req.userHasPermissions(for: .readUsers)
+        guard try user.isCurrentUser(for: req) || hasPermissions else {
+            throw Abort(.unauthorized)
+        }
         guard let roleID = user.$role.id,
               let role = try await Role.find(roleID, on: req.db)
         else {

@@ -58,7 +58,7 @@ final class User: Model, Content {
         username: String,
         password: String,
         isAdmin: Bool? = nil,
-        role: Role? = nil
+        roleID: UUID? = nil
     ) throws {
         self.id = UUID()
         self.username = username
@@ -66,7 +66,11 @@ final class User: Model, Content {
         self.createdAt = .now
         self.updatedAt = .now
         self.adminPrivileges = (isAdmin ?? false) ? .admin : .none
-        self.$role.id = try role?.requireID()
+        
+        // some fields don't matter for admins
+        if let isAdmin, !isAdmin {
+            self.$role.id = roleID
+        }
     }
     
     // MARK: - Methods
