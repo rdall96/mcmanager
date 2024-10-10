@@ -5,66 +5,6 @@
 
 ## Ideas
 
-**Permissions**
-
-User permissions to limit service functionality, discord style. Ideally it's a static set of permissions applied to all users where each field is a boolean (i.e.: VIEW_SETTINGS will determine if a user can see the MCManager settings).
-
-Below is a draft of the permissions we plan on adding to MCManager. The name is the key name in the database, and the default value is the value that will be applied to all newly created users.
-
-| Permission Name    | Default Value |
-| ------------------ | ------------- |
-| VIEW_SETTINGS      | 1             |
-| EDIT_SETTINGS      | 0             |
-
-| CREATE_USERS       | 0             |
-| VIEW_USERS         | 1             |
-| USER_PERMISSIONS   | 0             |
-
-| CREATE_EDIT_SERVER | 0             |
-| SERVER_INFO        | 1             |
-| SERVER_METRICS     | 0             |
-| SERVER_CONFIG      | 0             |
-| SERVER_EXECUTION   | 1             |
-| SERVER_LOGS        | 0             |
-| SERVER_COMMANDS    | 0             |
-
-Each set of permissions will be represented by an object like the following.
-```swift
-struct Permissions {
-    var viewSettings: Bool
-    var editSettings: Bool
-    var createUsers: Bool
-    var viewUsers: Bool
-    // and so on...
-}
-```
-
-This list of permissions will be assigned to a `UserRole` with the following schema:
-```swift
-struct UserRole {
-    /// id of the role (required by the database)
-    let id: UUID
-    /// name of the role publicly visible to everyone
-    let name: String
-    /// list of permissions that apply to this group
-    let permissions: Permissions
-}
-```
-
-Each `User` can be assigned a role in order to represent their permissions:
-```swift
-extension User {
-    var role: UUID
-}
-```
-
-APIs:
-- GET /roles, list of roles
-- POST /roles, create a new role
-- GET /roles/<role_id>, info about a role
-- PUT /roles/<role_id>, edit a role
-
-
 **Groups**
 
 Groups will be a great feature to subdivide users and servers alike. A server can only be part of one group, while users cna be part of multiple groups.
