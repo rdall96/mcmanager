@@ -281,7 +281,19 @@ components:
           example: 'E18DE084-C565-4059-8DD5-1AE50E997CD1'
         name:
           type: string
-          example 'Default'
+          example: 'Default'
+        permissions:
+          type: object
+          properties:
+            application:
+              type: integer
+              example: 1
+            users:
+              type: integer
+              example: 3
+            servers:
+              type: integer
+              example: 255
         createdAt:
           type: string
           example: '2024-10-05T04:20:42Z'
@@ -1049,6 +1061,27 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/User'
+  /api/v1/users/{id}/role:
+    get:
+      summary: Get role of a user
+      tags: [Users]
+      security:
+        - AccessToken: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          type: string
+          description: The user ID
+      responses:
+        '200':
+          description: The user has a role
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+        '404':
+          description: User not found or it doesn't have a role
   /api/v1/roles:
     get:
       summary: List all the user roles
