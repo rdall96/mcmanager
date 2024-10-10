@@ -34,8 +34,8 @@ struct RoleController: MCManagerAPIRoute, RouteCollection {
     }
     
     func create(req: Request) async throws -> Role {
-        // Only admins can create new roles
-        try requireAdmin(for: req)
+        try requireAdmin(for: req) // only admins can create new roles
+        
         let newRole = try req.content.decode(Role.self)
         try await newRole.save(on: req.db)
         return newRole
@@ -46,6 +46,8 @@ struct RoleController: MCManagerAPIRoute, RouteCollection {
     }
     
     func update(req: Request) async throws -> Role {
+        try requireAdmin(for: req) // only admins can edit roles
+        
         let role = try await req.role
         let roleRequest = try req.content.decode(Role.self)
         role.update(with: roleRequest)
@@ -54,6 +56,8 @@ struct RoleController: MCManagerAPIRoute, RouteCollection {
     }
     
     func delete(req: Request) async throws -> HTTPStatus {
+        try requireAdmin(for: req) // only admins can delete roles
+        
         let role = try await req.role
         // Ensure there are no users with this role, otherwise this would cause a permission havoc
         let roleIsUnused = try await User.query(on: req.db)

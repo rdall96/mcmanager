@@ -27,8 +27,6 @@ struct Permissions: Codable {
         static let createUsers =            Users(rawValue: 1 << 1)
         static let editUsers =              Users(rawValue: 1 << 2)
         static let deleteUsers =            Users(rawValue: 1 << 3)
-        
-        static let manageUserPermissions =  Users(rawValue: 1 << 4)
     }
     
     struct Servers: OptionSet, Codable {
@@ -55,8 +53,8 @@ struct Permissions: Codable {
     }
     
     static let defaults = Permissions(
-        application: Application.readSettings,
-        users: Users.readUsers,
+        application: .readSettings,
+        users: .readUsers,
         servers: Servers(rawValue: .max)
     )
     
