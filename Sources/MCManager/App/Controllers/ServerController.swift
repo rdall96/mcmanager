@@ -88,6 +88,9 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
     }
     
     func create(req: Request) async throws -> MCServer {
+        guard try await req.userHasPermissions(for: .createServers) else {
+            throw Abort(.unauthorized)
+        }
         let server = try req.content.decode(MCServer.self)
         try await ensureIsValid(server: server, on: req.db)
         try await server.save(on: req.db)
@@ -107,6 +110,9 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
     }
     
     func update(req: Request) async throws -> MCServer {
+        guard try await req.userHasPermissions(for: .editServers) else {
+            throw Abort(.unauthorized)
+        }
         let serverRequest = try req.content.decode(MCServer.self)
         let server = try await req.server
         
@@ -128,6 +134,9 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
     }
     
     func delete(req: Request) async throws -> HTTPStatus {
+        guard try await req.userHasPermissions(for: .deleteServers) else {
+            throw Abort(.unauthorized)
+        }
         let serverID = try req.serverID
         let server = try await req.server
         
@@ -148,6 +157,9 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
     // MARK: - Runtime support
     
     func support(req: Request) async throws -> [MCServer.RuntimeSupport] {
+        guard try await req.userHasPermissions(for: .createServers) else {
+            throw Abort(.unauthorized)
+        }
         return try await orchestra.allSupportedRuntimes
     }
     
@@ -196,15 +208,24 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
     // MARK: - Properties & config
     
     func defaultProperties(req: Request) async throws -> MCServer.Properties {
-        MCServer.Properties.defaults
+        guard try await req.userHasPermissions(for: .readServerProperties) else {
+            throw Abort(.unauthorized)
+        }
+        return MCServer.Properties.defaults
     }
     
     func properties(req: Request) async throws -> MCServer.Properties {
+        guard try await req.userHasPermissions(for: .readServerProperties) else {
+            throw Abort(.unauthorized)
+        }
         let serverID = try req.serverID
         return try await orchestra.properties(for: serverID)
     }
     
     func updateProperties(req: Request) async throws -> HTTPStatus {
+        guard try await req.userHasPermissions(for: .editServerProperties) else {
+            throw Abort(.unauthorized)
+        }
         let serverID = try req.serverID
         let properties = try req.content.decode(MCServer.Properties.self)
         try await orchestra.updateProperties(properties, for: serverID)
@@ -214,6 +235,9 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
     // MARK: - Execution
     
     func start(req: Request) async throws -> HTTPStatus {
+        guard try await req.userHasPermissions(for: .startStopServers) else {
+            throw Abort(.unauthorized)
+        }
         let serverID = try req.serverID
         let settings = try await settings(on: req.db)
         guard await orchestra.runningServersCount < settings.maxRunningServers else {
@@ -226,6 +250,9 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
     }
     
     func stop(req: Request) async throws -> HTTPStatus {
+        guard try await req.userHasPermissions(for: .startStopServers) else {
+            throw Abort(.unauthorized)
+        }
         let serverID = try req.serverID
         try await orchestra.stopServer(with: serverID)
         // invalidate the status cache
@@ -234,6 +261,9 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
     }
     
     func command(req: Request) async throws -> HTTPStatus {
+        guard try await req.userHasPermissions(for: .sendServerCommands) else {
+            throw Abort(.unauthorized)
+        }
         let serverID = try req.serverID
         guard let command = try? req.content.decode(String.self) else {
             throw Abort(.badRequest, reason: "Missing command in request body")
@@ -243,6 +273,9 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
     }
     
     func logs(req: Request) async throws -> [String] {
+        guard try await req.userHasPermissions(for: .readServerLogs) else {
+            throw Abort(.unauthorized)
+        }
         let serverID = try req.serverID
         var tail: UInt? = nil
         if let tailValue = req.query[UInt.self, at: "tail"] {
@@ -254,6 +287,9 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
     // MARK: - File management
     
     func download(req: Request) async throws -> Response {
+        guard try await req.userHasPermissions(for: .downloadServer) else {
+            throw Abort(.unauthorized)
+        }
         let serverID = try req.serverID
         let fileURL: URL
         do {
@@ -280,6 +316,9 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
     }
     
     func uploadFile(req: Request) async throws -> HTTPStatus {
+        guard try await req.userHasPermissions(for: .uploadServerFiles) else {
+            throw Abort(.unauthorized)
+        }
         let serverID = try req.serverID
         
         let metadata = try req.query.decode(FileUploadRequest.self)
@@ -304,6 +343,9 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
     }
     
     func removeFile(req: Request) async throws -> HTTPStatus {
+        guard try await req.userHasPermissions(for: .deleteServerFiles) else {
+            throw Abort(.unauthorized)
+        }
         let serverID = try req.serverID
         guard let relativePath = req.query[String.self, at: "path"] else {
             throw Abort(.badRequest, reason: "Missing file path to remove in request query")
@@ -316,6 +358,9 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
     }
     
     func downloadFile(req: Request) async throws -> Response {
+        guard try await req.userHasPermissions(for: .downloadServerFiles) else {
+            throw Abort(.unauthorized)
+        }
         let serverID = try req.serverID
         guard let relativePath = req.query[String.self, at: "path"] else {
             throw Abort(.badRequest, reason: "Missing path of file to download in request query")
