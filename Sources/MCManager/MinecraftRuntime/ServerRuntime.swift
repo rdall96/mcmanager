@@ -199,16 +199,21 @@ final actor ServerRuntime: Identifiable {
     
     // MARK: - Docker runtime
     
+    var dockerProcessStatus: Docker.Container.Status {
+        get async {
+            do {
+                return try await Docker.status(of: process)
+            }
+            catch {
+                logger.critical("Failed to fetch container status from docker: \(error)")
+                return .unknown
+            }
+        }
+    }
+    
     /// Refresh the process status
-    private func updateStatus() async {
-        let dockerStatus: Docker.Container.Status
-        do {
-            dockerStatus = try await Docker.status(of: process)
-        }
-        catch {
-            logger.critical("Failed to fetch container status from docker: \(error)")
-            dockerStatus = .unknown
-        }
+    func updateStatus() async {
+        let dockerStatus = await dockerProcessStatus
         if case .running = dockerStatus {
             let logs = (try? await logs().reversed()) ?? []
             status = MCServer.Status.latestStatus(in: logs.joined(separator: "\n"))

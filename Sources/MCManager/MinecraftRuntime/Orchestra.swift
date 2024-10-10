@@ -174,7 +174,10 @@ final class MCServerOrchestra {
         get async {
             await withTaskGroup(of: Bool.self, returning: UInt.self) { group in
                 serverRuntimes.values.forEach { server in
-                    group.addTask { await server.isRunning }
+                    group.addTask {
+                        let status = await server.dockerProcessStatus
+                        return status == .running || status == .restarting || status == .paused
+                    }
                 }
                 var count: UInt = 0
                 while let result = await group.next() {
