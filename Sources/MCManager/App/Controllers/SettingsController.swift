@@ -30,29 +30,34 @@ struct SettingsController: MCManagerAPIRoute, RouteCollection {
         guard try await req.userHasPermissions(for: .readSettings) else {
             throw Abort(.unauthorized)
         }
-        let all = try await Settings.query(on: req.db).all()
-        return all.first ?? .defaults
+        return try await Settings.query(on: req.db).first() ?? .defaults
     }
     
     func update(req: Request) async throws -> HTTPStatus {
         guard try await req.userHasPermissions(for: .editSettings) else {
             throw Abort(.unauthorized)
         }
-        // check if the given settigns are valid
         let settings = try req.content.decode(Settings.self)
+        
         // delete all other entries
-        for item in try await Settings.query(on: req.db).all() {
-            try await item.delete(on: req.db)
-            // if we changed the server status cache ttl, we need to expire the existing caches
-            if item.serverStatusCacheTTLSeconds != settings.serverStatusCacheTTLSeconds {
-                try await ServerStatusCache.query(on: req.db).all()
-                    .delete(on: req.db)
-            }
+        let existingSettings = try await Settings.query(on: req.db).all()
+        try await existingSettings.delete(on: req.db)
+        
+        // if we changed the server status cache ttl, we need to expire the existing caches
+        let serverStatusTTLChanged = !existingSettings.filter {
+            $0.serverStatusCacheTTLSeconds != settings.serverStatusCacheTTLSeconds
+        }.isEmpty
+        if serverStatusTTLChanged {
+            try await ServerStatusCache.query(on: req.db).delete()
         }
+        
         // save the new settings (this will create a DB entry if it doesn't exist)
         try await settings.save(on: req.db)
+        logger.notice("Updated MCManager application settings, a restart might be required")
+        
+        // notify listeners
         onUpdate(settings)
-        logger.notice("Updated MCManager server settings, a restart might be required")
+        
         return .ok
     }
 }

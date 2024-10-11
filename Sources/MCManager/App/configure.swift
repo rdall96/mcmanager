@@ -78,11 +78,6 @@ fileprivate func firstTimeSetup(_ app: Application) async throws {
         let admin = try User.createSuperAdmin(password: "mcmanager")
         try await admin.save(on: app.db)
     }
-    
-    // Write default settings
-    if try await Settings.query(on: app.db).all().isEmpty {
-        try await Settings.defaults.save(on: app.db)
-    }
 }
 
 // MARK: - Key signing and security

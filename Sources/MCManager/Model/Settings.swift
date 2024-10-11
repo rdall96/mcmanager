@@ -11,6 +11,8 @@ import Vapor
 final class Settings: Model, Content {
     static let schema = "settings"
     
+    static let validPortRange: ClosedRange<UInt16> = 1024...65535
+    
     enum FieldKeys: FieldKey {
         case serverStatusCacheTTLSeconds = "server_status_cache_ttl_seconds"
         case allowedServerPorts = "allowed_server_ports"
@@ -95,20 +97,4 @@ final class Settings: Model, Content {
         try container.encode(allowedServerPorts, forKey: .allowedServerPorts)
         try container.encode(maxRunningServers, forKey: .maxRunningServers)
     }
-}
-
-// MARK: - Defaults and parameters
-extension Settings {
-    private static var validPortRange: ClosedRange<UInt16> { 1024...65535 }
-    
-    static var defaults: Settings {
-        .init(
-            serverStatusCacheTTLSeconds: 5,
-            allowedServerPorts: "\(Settings.validPortRange.lowerBound)-\(Settings.validPortRange.upperBound)",
-            maxRunningServers: 10
-        )
-    }
-    
-    /// If the server status cache is enabled
-    var serverStatusCacheIsEnabled: Bool { serverStatusCacheTTLSeconds > 0 }
 }

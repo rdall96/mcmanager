@@ -425,3 +425,8 @@ fileprivate extension Request {
         }
     }
 }
+
+fileprivate extension Settings {
+    /// If the server status cache is enabled
+    var serverStatusCacheIsEnabled: Bool { serverStatusCacheTTLSeconds > 0 }
+}
