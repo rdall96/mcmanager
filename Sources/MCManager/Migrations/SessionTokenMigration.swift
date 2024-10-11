@@ -14,18 +14,18 @@ extension SessionToken {
     }
     
     struct CreateTable: AsyncMigration {
-        func prepare(on database: Database) async throws {
+        func prepare(on database: any Database) async throws {
             try await database.schema(SessionToken.schema)
                 .id()
-                .field(SessionToken.FieldKeys.subject.rawValue, .string, .required)
-                .field(SessionToken.FieldKeys.issuedAt.rawValue, .datetime, .required)
-                .field(SessionToken.FieldKeys.expiresAt.rawValue, .datetime, .required)
-                .field(SessionToken.FieldKeys.userId.rawValue, .uuid, .references(User.schema, .id))
+                .field(FieldKeys.subject.rawValue, .string, .required)
+                .field(FieldKeys.issuedAt.rawValue, .datetime, .required)
+                .field(FieldKeys.expiresAt.rawValue, .datetime, .required)
+                .field(FieldKeys.userId.rawValue, .uuid, .references(User.schema, .id))
                 .ignoreExisting()
                 .create()
         }
         
-        func revert(on database: Database) async throws {
+        func revert(on database: any Database) async throws {
             try await database.schema(SessionToken.schema).delete()
         }
     }

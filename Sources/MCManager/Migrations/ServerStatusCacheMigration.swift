@@ -14,17 +14,17 @@ extension ServerStatusCache {
     }
     
     struct CreateTable: AsyncMigration {
-        func prepare(on database: Database) async throws {
+        func prepare(on database: any Database) async throws {
             try await database.schema(ServerStatusCache.schema)
                 .id()
-                .field(ServerStatusCache.FieldKeys.expiresAt.rawValue, .datetime, .required)
-                .field(ServerStatusCache.FieldKeys.infoData.rawValue, .data, .required)
-                .field(ServerStatusCache.FieldKeys.statsData.rawValue, .data, .required)
+                .field(FieldKeys.expiresAt.rawValue, .datetime, .required)
+                .field(FieldKeys.infoData.rawValue, .data, .required)
+                .field(FieldKeys.statsData.rawValue, .data, .required)
                 .ignoreExisting()
                 .create()
         }
         
-        func revert(on database: Database) async throws {
+        func revert(on database: any Database) async throws {
             try await database.schema(ServerStatusCache.schema).delete()
         }
     }

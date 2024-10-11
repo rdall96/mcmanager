@@ -14,20 +14,21 @@ extension MCServer {
     }
     
     struct CreateTable: AsyncMigration {
-        func prepare(on database: Database) async throws {
+        func prepare(on database: any Database) async throws {
             try await database.schema(MCServer.schema)
                 .id()
-                .field(MCServer.FieldKeys.name.rawValue, .string, .required)
-                .field(MCServer.FieldKeys.type.rawValue, .string, .required)
-                .field(MCServer.FieldKeys.version.rawValue, .string, .required)
-                .field(MCServer.FieldKeys.port.rawValue, .uint32, .required)
-                .field(MCServer.FieldKeys.createdAt.rawValue, .datetime, .required)
-                .field(MCServer.FieldKeys.updatedAt.rawValue, .datetime, .required)
+                .field(FieldKeys.name.rawValue, .string, .required)
+                .unique(on: FieldKeys.name.rawValue)
+                .field(FieldKeys.type.rawValue, .string, .required)
+                .field(FieldKeys.version.rawValue, .string, .required)
+                .field(FieldKeys.port.rawValue, .uint32, .required)
+                .field(FieldKeys.createdAt.rawValue, .datetime, .required)
+                .field(FieldKeys.updatedAt.rawValue, .datetime, .required)
                 .ignoreExisting()
                 .create()
         }
         
-        func revert(on database: Database) async throws {
+        func revert(on database: any Database) async throws {
             try await database.schema(MCServer.schema).delete()
         }
     }
