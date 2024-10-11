@@ -60,6 +60,9 @@ components:
         allowedServerPorts:
           type: string
           example: '1024-65535'
+        maxRunningServers:
+          type: integer
+          example: 7
     ServerSupport:
       type: object
       description: List of server types and versions that can be created with MCManager
@@ -272,6 +275,19 @@ components:
         role:
           type: string
           example: 'E18DE084-C565-4059-8DD5-1AE50E997CD1'
+    Permissions:
+      type: object
+      description: User permission sets organized by category
+      properties:
+        application:
+          type: integer
+          example: 1
+        users:
+          type: integer
+          example: 3
+        servers:
+          type: integer
+          example: 255
     Role:
       type: object
       description: Information about a user roles
@@ -283,17 +299,7 @@ components:
           type: string
           example: 'Default'
         permissions:
-          type: object
-          properties:
-            application:
-              type: integer
-              example: 1
-            users:
-              type: integer
-              example: 3
-            servers:
-              type: integer
-              example: 255
+          $ref: '#/components/schemas/Permissions'
         createdAt:
           type: string
           example: '2024-10-05T04:20:42Z'
@@ -1061,27 +1067,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/User'
-  /api/v1/users/{id}/role:
-    get:
-      summary: Get role of a user
-      tags: [Users]
-      security:
-        - AccessToken: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          type: string
-          description: The user ID
-      responses:
-        '200':
-          description: The user has a role
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Role'
-        '404':
-          description: User not found or it doesn't have a role
   /api/v1/roles:
     get:
       summary: List all the user roles
@@ -1201,3 +1186,35 @@ paths:
                   $ref: '#/components/schemas/User'
         '404':
           description: Role not found
+  /api/v1/roles/permissions:
+    get:
+      summary: Fetch default user permissions
+      tags: [Roles]
+      security:
+        - AccessToken: []
+      responses:
+        '200':
+          description: Default user permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Permissions'
+    put:
+      summary: Update default user permissions
+      tags: [Roles]
+      security:
+        - AccessToken: []
+      requestBody:
+        required: true
+        description: Default permissions to update
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Permissions'
+      responses:
+        '200':
+          description: Updated default user permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Permissions'
