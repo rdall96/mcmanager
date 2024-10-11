@@ -7,17 +7,88 @@
 
 import Foundation
 import Fluent
+import Vapor
 
-struct Permissions: Codable {
-    let application: Application
-    let users: Users
-    let servers: Servers
+final class Permissions: Model, Content {
+    static let schema = "permissions"
+    
+    enum FieldKeys: FieldKey {
+        case isDefaults = "is_defaults"
+        case application
+        case users
+        case servers
+    }
+    
+    // MARK: - Members
+    
+    @ID(key: .id)
+    var id: UUID?
+    
+    @Field(key: FieldKeys.isDefaults.rawValue)
+    internal var isDefaults: Bool
+    
+    @Field(key: FieldKeys.application.rawValue)
+    var application: Application
+    
+    @Field(key: FieldKeys.users.rawValue)
+    var users: Users
+    
+    @Field(key: FieldKeys.servers.rawValue)
+    var servers: Servers
+    
+    // MARK: - Initializers
+    
+    init() {}
+    
+    init(application: Application, users: Users, servers: Servers) {
+        self.id = UUID()
+        self.isDefaults = false
+        self.application = application
+        self.users = users
+        self.servers = servers
+    }
+    
+    // MARK: - Methods
+    
+    func update(with newPermissions: Permissions) {
+        application = newPermissions.application
+        users = newPermissions.users
+        servers = newPermissions.servers
+    }
+    
+    // MARK: - Codable
+    
+    private enum CodingKeys: String, CodingKey {
+        case application = "app"
+        case users
+        case servers
+    }
+    
+    convenience init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            application: Application(rawValue: try container.decode(UInt64.self, forKey: .application)),
+            users: Users(rawValue: try container.decode(UInt64.self, forKey: .users)),
+            servers: Servers(rawValue: try container.decode(UInt64.self, forKey: .servers))
+        )
+    }
+    
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(application.rawValue, forKey: .application)
+        try container.encode(users.rawValue, forKey: .users)
+        try container.encode(servers.rawValue, forKey: .servers)
+    }
+}
+
+// MARK: - Permissions
+extension Permissions {
     
     struct Application: OptionSet, Codable {
         let rawValue: UInt64
         
         static let readSettings =   Application(rawValue: 1 << 0)
-        static let editSettings =  Application(rawValue: 1 << 1)
+        static let editSettings =   Application(rawValue: 1 << 1)
     }
     
     struct Users: OptionSet, Codable {
@@ -38,7 +109,7 @@ struct Permissions: Codable {
         
         // server properties
         static let readServerProperties =   Servers(rawValue: 1 << 3)
-        static let editServerProperties =  Servers(rawValue: 1 << 4)
+        static let editServerProperties =   Servers(rawValue: 1 << 4)
         
         // execution
         static let startStopServers =       Servers(rawValue: 1 << 5)
@@ -51,91 +122,4 @@ struct Permissions: Codable {
         static let uploadServerFiles =      Servers(rawValue: 1 << 10)
         static let deleteServerFiles =      Servers(rawValue: 1 << 11)
     }
-    
-    static let defaults = Permissions(
-        application: .readSettings,
-        users: .readUsers,
-        servers: [
-            .createServers, .editServers, .deleteServers,
-            .readServerProperties, .editServerProperties,
-            .startStopServers, .readServerLogs,
-            .downloadServerFiles, .uploadServerFiles, .deleteServerFiles
-        ]
-    )
-    
-    static let all = Permissions(
-        application: .init(rawValue: .max),
-        users: .init(rawValue: .max),
-        servers: .init(rawValue: .max)
-    )
 }
-
-//struct PermissionResponse {
-//    
-//    struct Application: Codable {
-//        
-//        let readSettings: Bool
-//        let writeSettings: Bool
-//        
-//        static let defaults = Application(
-//            readSettings: true,
-//            writeSettings: false
-//        )
-//    }
-//    
-//    struct Users: Codable {
-//        
-//        let readUsers: Bool
-//        let createUsers: Bool
-//        let editUsers: Bool
-//        let deleteUsers: Bool
-//        
-//        let manageUserPermissions: Bool
-//        
-//        static let defaults = Users(
-//            readUsers: true,
-//            createUsers: false,
-//            editUsers: false,
-//            deleteUsers: false,
-//            manageUserPermissions: false
-//        )
-//    }
-//    
-//    
-//    struct Servers: Codable {
-//        
-//        let createServers: Bool
-//        let editServers: Bool
-//        let deleteServers: Bool
-//        
-//        // server properties
-//        let readServerProperties: Bool
-//        let writeServerProperties: Bool
-//        
-//        // execution
-//        let startStopServers: Bool
-//        let readServerLogs: Bool
-//        let sendServerCommands: Bool
-//        
-//        // files
-//        let downloadServer: Bool
-//        let downloadServerFiles: Bool
-//        let uploadServerFiles: Bool
-//        let deleteServerFiles: Bool
-//        
-//        static let defaults = Servers(
-//            createServers: true,
-//            editServers: true,
-//            deleteServers: true,
-//            readServerProperties: true,
-//            writeServerProperties: true,
-//            startStopServers: true,
-//            readServerLogs: true,
-//            sendServerCommands: true,
-//            downloadServer: true,
-//            downloadServerFiles: true,
-//            uploadServerFiles: true,
-//            deleteServerFiles: true
-//        )
-//    }
-//}

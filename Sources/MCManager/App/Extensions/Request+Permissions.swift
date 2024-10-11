@@ -8,6 +8,37 @@
 import Foundation
 import Vapor
 
+extension Permissions {
+    
+    private convenience init(
+        isDefaults: Bool = false,
+        application: Application,
+        users: Users,
+        servers: Servers
+    ) {
+        self.init(application: application, users: users, servers: servers)
+        self.isDefaults = isDefaults
+    }
+    
+    static var defaults = Permissions(
+        isDefaults: true,
+        application: .readSettings,
+        users: .readUsers,
+        servers: [
+            .createServers, .editServers, .deleteServers,
+            .readServerProperties, .editServerProperties,
+            .startStopServers, .readServerLogs,
+            .downloadServerFiles, .uploadServerFiles, .deleteServerFiles
+        ]
+    )
+    
+    fileprivate static var all = Permissions(
+        application: .init(rawValue: .max),
+        users: .init(rawValue: .max),
+        servers: .init(rawValue: .max)
+    )
+}
+
 extension Request {
     
     /// Get the permissions of the user making the request

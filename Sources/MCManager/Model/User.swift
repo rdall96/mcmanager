@@ -133,7 +133,7 @@ final class User: Model, Content {
     // override encoding since we want to omit the password field
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(id, forKey: .id)
+        try container.encode(try requireID(), forKey: .id)
         try container.encode(username, forKey: .username)
         try container.encode(createdAt, forKey: .createdAt)
         try container.encode(updatedAt, forKey: .updatedAt)

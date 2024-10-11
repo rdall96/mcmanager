@@ -33,13 +33,13 @@ extension Role {
     struct AddPermissions: AsyncMigration {
         func prepare(on database: any Database) async throws {
             try await database.schema(Role.schema)
-                .field(FieldKeys.permissions.rawValue, .data)
+                .field(FieldKeys.permissionsID.rawValue, .uuid, .references(Permissions.schema, .id))
                 .update()
         }
         
         func revert(on database: any Database) async throws {
             try await database.schema(Role.schema)
-                .deleteField(FieldKeys.permissions.rawValue)
+                .deleteField(FieldKeys.permissionsID.rawValue)
                 .update()
         }
     }

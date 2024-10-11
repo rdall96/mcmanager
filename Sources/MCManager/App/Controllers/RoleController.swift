@@ -25,24 +25,38 @@ struct RoleController: MCManagerAPIRoute, RouteCollection {
             
             role.get("members", use: members)
         }
+        
+        // default permissions
+        roles.get("permissions", use: defaultPermissions)
+        roles.put("permissions", use: editDefaultPermissions)
     }
     
     // MARK: - Routes
     
     func all(req: Request) async throws -> [Role] {
-        try await Role.query(on: req.db).all()
+        let roles = try await Role.query(on: req.db).all()
+        for role in roles {
+            role.permissions = try await Permissions.find(role.$_permissions.id, on: req.db)
+        }
+        return roles
     }
     
     func create(req: Request) async throws -> Role {
         try requireAdmin(for: req) // only admins can create new roles
-        
         let newRole = try req.content.decode(Role.self)
+        
+        // create the permissions
+        try await newRole.permissions?.save(on: req.db)
+        // save the new role
         try await newRole.save(on: req.db)
+        
         return newRole
     }
     
     func role(req: Request) async throws -> Role {
-        try await req.role
+        let role = try await req.role
+        role.permissions = try await Permissions.find(role.$_permissions.id, on: req.db)
+        return role
     }
     
     func update(req: Request) async throws -> Role {
@@ -50,8 +64,19 @@ struct RoleController: MCManagerAPIRoute, RouteCollection {
         
         let role = try await req.role
         let roleRequest = try req.content.decode(Role.self)
+        
+        // update the permissions
+        if let permissions = try await Permissions.find(role.$_permissions.id, on: req.db),
+           let newPermissions = roleRequest.permissions {
+            permissions.update(with: newPermissions)
+            role.permissions = permissions
+            try await permissions.save(on: req.db)
+        }
+        
+        // update the role
         role.update(with: roleRequest)
         try await role.save(on: req.db)
+        
         return role
     }
     
@@ -68,6 +93,7 @@ struct RoleController: MCManagerAPIRoute, RouteCollection {
             throw Abort(.notAcceptable, reason: "There are still users with this role")
         }
         try await role.delete(on: req.db)
+        try await Permissions.find(role.$_permissions.id, on: req.db)?.delete(on: req.db)
         return .noContent
     }
     
@@ -76,6 +102,26 @@ struct RoleController: MCManagerAPIRoute, RouteCollection {
         return try await User.query(on: req.db)
             .filter(\.$role.$id, .equal, try role.requireID())
             .all()
+    }
+    
+    // MARK: - Default Permissions
+    
+    func defaultPermissions(req: Request) async throws -> Permissions {
+        try requireAdmin(for: req) // only admins can manage default permissions
+        return try await Permissions.query(on: req.db)
+            .filter(\Permissions.$isDefaults, .equal, true)
+            .first() ?? .defaults
+    }
+    
+    func editDefaultPermissions(req: Request) async throws -> Permissions {
+        try requireAdmin(for: req) // only admins can manage default permissions
+        let updatedPermissions = try req.content.decode(Permissions.self)
+        let defaultPermissions = try await Permissions.query(on: req.db)
+            .filter(\Permissions.$isDefaults, .equal, true)
+            .first() ?? .defaults
+        defaultPermissions.update(with: updatedPermissions)
+        try await defaultPermissions.save(on: req.db)
+        return updatedPermissions
     }
 }
 

@@ -14,7 +14,7 @@ final class Role: Model, Content {
     
     enum FieldKeys: FieldKey {
         case name
-        case permissions
+        case permissionsID = "permissions_id"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
@@ -27,8 +27,9 @@ final class Role: Model, Content {
     @Field(key: FieldKeys.name.rawValue)
     var name: String
     
-    @Field(key: FieldKeys.permissions.rawValue)
-    private var _permissions: Permissions?
+    @Parent(key: FieldKeys.permissionsID.rawValue)
+    private(set) var _permissions: Permissions
+    var permissions: Permissions?
     
     @Field(key: FieldKeys.createdAt.rawValue)
     var createdAt: Date
@@ -40,25 +41,19 @@ final class Role: Model, Content {
     
     init() {}
     
-    init(name: String, permissions: Permissions? = nil) {
+    init(name: String, permissions: Permissions) throws {
         self.id = UUID()
         self.name = name
-        self._permissions = permissions
+        self.$_permissions.id = try permissions.requireID()
+        self.permissions = permissions
         self.createdAt = .now
         self.updatedAt = .now
     }
     
     // MARK: - Methods
     
-    var permissions: Permissions {
-        _permissions ?? .defaults
-    }
-    
     func update(with roleRequest: Role) {
         name = roleRequest.name
-        if let newPermissions = roleRequest._permissions {
-            _permissions = newPermissions
-        }
         updatedAt = .now
     }
     
@@ -74,9 +69,9 @@ final class Role: Model, Content {
     
     convenience init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.init(
+        try self.init(
             name: try container.decode(String.self, forKey: .name),
-            permissions: try container.decodeIfPresent(Permissions.self, forKey: .permissions)
+            permissions: try container.decode(Permissions.self, forKey: .permissions)
         )
     }
     

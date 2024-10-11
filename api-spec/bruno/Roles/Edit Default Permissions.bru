@@ -1,0 +1,19 @@
+meta {
+  name: Edit Default Permissions
+  type: http
+  seq: 8
+}
+
+put {
+  url: {{base_url}}/api/v1/roles/permissions
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "app": 3, // read and write settings
+    "users": 1, // read users
+    "servers": 4095 // pretty much everything at the time of writing this (0-11)
+  }
+}

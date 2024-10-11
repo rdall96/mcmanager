@@ -129,7 +129,7 @@ extension SessionToken: Encodable {
     
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: Keys.self)
-        try container.encode(id, forKey: .id)
+        try container.encode(try requireID(), forKey: .id)
         try container.encode(sub, forKey: .sub)
         try container.encode(userStorage, forKey: .user)
         try container.encode(iat, forKey: .iat)
