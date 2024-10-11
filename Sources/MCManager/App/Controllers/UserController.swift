@@ -23,8 +23,6 @@ struct UserController: MCManagerAPIRoute, RouteCollection {
             user.get(use: self.user(req:))
             user.put(use: update)
             user.delete(use: delete)
-            
-            user.get("role", use: role)
         }
     }
     
@@ -115,20 +113,6 @@ struct UserController: MCManagerAPIRoute, RouteCollection {
         try await user.delete(on: req.db)
         
         return .noContent
-    }
-    
-    func role(req: Request) async throws -> Role {
-        let user = try await req.user
-        let hasPermissions = try await req.userHasPermissions(for: .readUsers)
-        guard try user.isCurrentUser(for: req) || hasPermissions else {
-            throw Abort(.unauthorized)
-        }
-        guard let roleID = user.$role.id,
-              let role = try await Role.find(roleID, on: req.db)
-        else {
-            throw Abort(.notFound)
-        }
-        return role
     }
 }
 
