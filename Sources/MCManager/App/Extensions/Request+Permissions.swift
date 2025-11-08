@@ -27,7 +27,7 @@ extension Permissions {
     ///         Any futher action on the default permissions should go through the proper route which interacts with the database instance.
     static var defaults = Permissions(
         isDefaults: true,
-        application: .readSettings,
+        application: [],
         users: .readUsers,
         servers: [
             .createServers, .editServers, .deleteServers,

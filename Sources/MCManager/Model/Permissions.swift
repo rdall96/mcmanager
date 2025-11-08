@@ -86,9 +86,8 @@ extension Permissions {
     
     struct Application: OptionSet, Codable {
         let rawValue: UInt64
-        
-        static let readSettings =   Application(rawValue: 1 << 0)
-        static let editSettings =   Application(rawValue: 1 << 1)
+
+        static let editSettings =   Application(rawValue: 1 << 0)
     }
     
     struct Users: OptionSet, Codable {

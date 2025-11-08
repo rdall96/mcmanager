@@ -27,10 +27,7 @@ struct SettingsController: MCManagerAPIRoute, RouteCollection {
     // MARK: - Routes
     
     func get(req: Request) async throws -> Settings {
-        guard try await req.userHasPermissions(for: .readSettings) else {
-            throw Abort(.unauthorized)
-        }
-        return try await Settings.query(on: req.db).first() ?? .defaults
+        try await Settings.query(on: req.db).first() ?? .defaults
     }
     
     func update(req: Request) async throws -> HTTPStatus {
