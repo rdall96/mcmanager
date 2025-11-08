@@ -81,8 +81,15 @@ fileprivate func firstTimeSetup(_ app: Application) async throws {
     
     if currentAdmin == nil {
         // If there's no admin user, create one
+        app.logger.notice("Creating admin user")
         let admin = try User.createSuperAdmin(password: "mcmanager")
         try await admin.save(on: app.db)
+    }
+
+    // If there are no default permissions, add them
+    if try await Permissions.defaults(on: app.db) == nil {
+        app.logger.notice("Setting default user permissions")
+        try await Permissions.defaults.save(on: app.db)
     }
 }
 
@@ -91,6 +98,7 @@ fileprivate func firstTimeSetup(_ app: Application) async throws {
 fileprivate func setupKeys(_ app: Application) async throws {
     let privateKeyPath = try app.directory.privateKeyPath
     if !FileManager.default.fileExists(atPath: privateKeyPath.path) {
+        app.logger.notice("Generating private key")
         await app.directory.generateKeys(at: privateKeyPath)
     }
     let key = try String(contentsOfFile: privateKeyPath.path)

@@ -7,6 +7,7 @@
 
 import Foundation
 import Vapor
+import FluentKit
 
 extension Permissions {
     
@@ -19,7 +20,11 @@ extension Permissions {
         self.init(application: application, users: users, servers: servers)
         self.isDefaults = isDefaults
     }
-    
+
+    /// Hard-coded default permissions.
+    ///
+    /// - NOTE: Only use this during first time setup to write the defaults to the database.
+    ///         Any futher action on the default permissions should go through the proper route which interacts with the database instance.
     static var defaults = Permissions(
         isDefaults: true,
         application: .readSettings,
@@ -31,7 +36,14 @@ extension Permissions {
             .downloadServerFiles, .uploadServerFiles, .deleteServerFiles
         ]
     )
-    
+
+    /// Read the default permissions from the given database.
+    static func defaults(on db: Database) async throws -> Permissions? {
+        try await Permissions.query(on: db)
+            .filter(\Permissions.$isDefaults, .equal, true)
+            .first()
+    }
+
     fileprivate static var all = Permissions(
         application: .init(rawValue: .max),
         users: .init(rawValue: .max),
@@ -50,13 +62,12 @@ extension Request {
             if user.isAdmin { return .all }
             
             // grab the user role and check the permissions there
-            guard let roleID = user.$role.id else {
-                return nil
-            }
-            let permissions = try await Role.find(roleID, on: db)?.permissions
-            
             // users without an assigned role, get default permissions
-            return permissions ?? .defaults
+            let defaultPermissions = try await Permissions.defaults(on: db)
+            guard let roleID = user.$role.id else {
+                return defaultPermissions
+            }
+            return try await Role.find(roleID, on: db)?.permissions ?? defaultPermissions
         }
     }
     
