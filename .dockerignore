@@ -1,7 +1,18 @@
+# Docker
+.dockerignore
+Dockerfile
+
+# System files
 .DS_Store
-.build/
-.swiftpm/
+.build
+.swiftpm
+.vscode
+
+# Git
+.git
 .gitignore
 .gitlab-ci.yml
 *.md
+api-spec
+
 

@@ -7,5 +7,5 @@ DerivedData/
 data/
 .swiftpm
 .env
-api-spec/environments/*
+api-spec/bruno/environments/*
 
