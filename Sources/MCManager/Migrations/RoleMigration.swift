@@ -18,7 +18,7 @@ extension Role {
             try await database.schema(Role.schema)
                 .id()
                 .field(FieldKeys.name.rawValue, .string, .required)
-                .unique(on: FieldKeys.name.rawValue)
+                .unique(on: FieldKeys.name.rawValue, name: "no_duplicate_\(FieldKeys.name.rawValue)")
                 .field(FieldKeys.permissionsID.rawValue, .uuid, .references(Permissions.schema, .id))
                 .field(FieldKeys.createdAt.rawValue, .datetime, .required)
                 .field(FieldKeys.updatedAt.rawValue, .datetime, .required)

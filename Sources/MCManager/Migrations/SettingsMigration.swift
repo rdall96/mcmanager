@@ -10,7 +10,10 @@ import Fluent
 extension Settings {
     
     static var migrations: [AsyncMigration] {
-        [CreateTable()]
+        [
+            CreateTable(),
+            AddServerSupportCacheTTLField(),
+        ]
     }
     
     struct CreateTable: AsyncMigration {
@@ -26,6 +29,26 @@ extension Settings {
         
         func revert(on database: Database) async throws {
             try await database.schema(Settings.schema).delete()
+        }
+    }
+
+    struct AddServerSupportCacheTTLField: AsyncMigration {
+        func prepare(on database: any Database) async throws {
+            try await database.schema(Settings.schema)
+                .field(
+                    FieldKeys.serverSupportCacheTTLSeconds.rawValue,
+                    .uint,
+                    .required,
+                    .sql(.default(Settings.defaults.serverSupportCacheTTLSeconds)),
+                )
+                .ignoreExisting()
+                .update()
+        }
+
+        func revert(on database: any Database) async throws {
+            try await database.schema(Settings.schema)
+                .deleteField(FieldKeys.serverSupportCacheTTLSeconds.rawValue)
+                .update()
         }
     }
 }

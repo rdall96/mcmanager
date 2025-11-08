@@ -160,7 +160,30 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         guard try await req.userHasPermissions(for: .createServers) else {
             throw Abort(.unauthorized)
         }
-        return try await manager.allSupportedRuntimes
+
+        // Check if we have cached values for the runtime support
+        let cachedRuntimeSupports = try await ServerRuntimeSupportCache.query(on: req.db).all()
+        let settings = try await self.settings(on: req.db)
+
+        // This data is written all at the same time, so if the first one is expired, they all are
+        if let cachedData = cachedRuntimeSupports.first,
+           !settings.serverSupportCacheIsExpired(cachedData) {
+            return cachedRuntimeSupports.map {
+                MCServer.RuntimeSupport(with: $0)
+            }
+        }
+        else {
+            // delete the cache
+            try await cachedRuntimeSupports.delete(on: req.db)
+        }
+
+        // Fetch new runtime support and cache the values
+        let runtimeSupports = try await manager.allSupportedRuntimes
+        for runtimeSupport in runtimeSupports {
+            try await ServerRuntimeSupportCache(with: runtimeSupport).save(on: req.db)
+        }
+
+        return runtimeSupports
     }
     
     // MARK: - Status
@@ -429,4 +452,9 @@ fileprivate extension Request {
 fileprivate extension Settings {
     /// If the server status cache is enabled
     var serverStatusCacheIsEnabled: Bool { serverStatusCacheTTLSeconds > 0 }
+
+    /// Determine if the server runtime support cache is expired.
+    func serverSupportCacheIsExpired(_ cache: ServerRuntimeSupportCache) -> Bool {
+        cache.createdAt.addingTimeInterval(TimeInterval(serverSupportCacheTTLSeconds)) < .now
+    }
 }

@@ -18,7 +18,7 @@ extension MCServer {
             try await database.schema(MCServer.schema)
                 .id()
                 .field(FieldKeys.name.rawValue, .string, .required)
-                .unique(on: FieldKeys.name.rawValue)
+                .unique(on: FieldKeys.name.rawValue, name: "no_duplicate_\(FieldKeys.name.rawValue)")
                 .field(FieldKeys.type.rawValue, .string, .required)
                 .field(FieldKeys.version.rawValue, .string, .required)
                 .field(FieldKeys.port.rawValue, .uint32, .required)

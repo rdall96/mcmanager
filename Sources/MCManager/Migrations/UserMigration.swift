@@ -18,7 +18,7 @@ extension User {
             try await database.schema(User.schema)
                 .id()
                 .field(FieldKeys.username.rawValue, .string, .required)
-                .unique(on: FieldKeys.username.rawValue)
+                .unique(on: FieldKeys.username.rawValue, name: "no_duplicate_\(FieldKeys.username.rawValue)")
                 .field(FieldKeys.password.rawValue, .string, .required)
                 .field(FieldKeys.createdAt.rawValue, .datetime, .required)
                 .field(FieldKeys.updatedAt.rawValue, .datetime, .required)

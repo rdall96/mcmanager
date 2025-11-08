@@ -15,6 +15,7 @@ final class Settings: Model, Content {
     
     enum FieldKeys: FieldKey {
         case serverStatusCacheTTLSeconds = "server_status_cache_ttl_seconds"
+        case serverSupportCacheTTLSeconds = "server_support_cache_ttl_seconds"
         case allowedServerPorts = "allowed_server_ports"
         case maxRunningServers = "max_running_servers"
     }
@@ -28,7 +29,15 @@ final class Settings: Model, Content {
     /// Important actions on servers, such as start/stop/restart, will automatically invalidate the cache.
     /// Set this to 0 to disable caching all together.
     var serverStatusCacheTTLSeconds: UInt
-    
+
+    @Field(key: FieldKeys.serverSupportCacheTTLSeconds.rawValue)
+    /// Time to live for the server runtime support cache.
+    /// The server runtime support determines what types and versions of Minecraft servers can be created.
+    /// The runtime support request is very expensive as we need to query what server versions are available online,
+    /// however this data doesn't change very often, so we cache it by default in order to return faster responses to the user.
+    /// Set this to 0 to disable caching this value.
+    var serverSupportCacheTTLSeconds: UInt
+
     @Field(key: FieldKeys.allowedServerPorts.rawValue)
     /// Ports allowed for server creation.
     /// This can be a combination of comma-separated port values and a port range
@@ -44,11 +53,13 @@ final class Settings: Model, Content {
     
     convenience init(
         serverStatusCacheTTLSeconds: UInt,
+        serverSupportCacheTTLSeconds: UInt,
         allowedServerPorts: String,
         maxRunningServers: UInt
     ) {
         self.init()
         self.serverStatusCacheTTLSeconds = serverStatusCacheTTLSeconds
+        self.serverSupportCacheTTLSeconds = serverSupportCacheTTLSeconds
         self.allowedServerPorts = allowedServerPorts.replacingOccurrences(of: " ", with: "")
         self.maxRunningServers = maxRunningServers
     }
@@ -76,6 +87,7 @@ final class Settings: Model, Content {
     
     private enum CodingKeys: String, CodingKey {
         case serverStatusCacheTTLSeconds
+        case serverSupportCacheTTLSeconds
         case allowedServerPorts
         case maxRunningServers
     }
@@ -85,6 +97,7 @@ final class Settings: Model, Content {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.init(
             serverStatusCacheTTLSeconds: try container.decode(UInt.self, forKey: .serverStatusCacheTTLSeconds),
+            serverSupportCacheTTLSeconds: try container.decode(UInt.self, forKey: .serverSupportCacheTTLSeconds),
             allowedServerPorts: try container.decode(String.self, forKey: .allowedServerPorts),
             maxRunningServers: try container.decode(UInt.self, forKey: .maxRunningServers)
         )
@@ -94,6 +107,7 @@ final class Settings: Model, Content {
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(serverStatusCacheTTLSeconds, forKey: .serverStatusCacheTTLSeconds)
+        try container.encode(serverSupportCacheTTLSeconds, forKey: .serverSupportCacheTTLSeconds)
         try container.encode(allowedServerPorts, forKey: .allowedServerPorts)
         try container.encode(maxRunningServers, forKey: .maxRunningServers)
     }
