@@ -25,17 +25,19 @@ extension Permissions {
     ///
     /// - NOTE: Only use this during first time setup to write the defaults to the database.
     ///         Any futher action on the default permissions should go through the proper route which interacts with the database instance.
-    static var defaults = Permissions(
-        isDefaults: true,
-        application: [],
-        users: .readUsers,
-        servers: [
-            .createServers, .editServers, .deleteServers,
-            .readServerProperties, .editServerProperties,
-            .startStopServers, .readServerLogs,
-            .downloadServerFiles, .uploadServerFiles, .deleteServerFiles
-        ]
-    )
+    static var defaults: Permissions {
+        Permissions(
+            isDefaults: true,
+            application: [],
+            users: .readUsers,
+            servers: [
+                .createServers, .editServers, .deleteServers,
+                .readServerProperties, .editServerProperties,
+                .startStopServers, .readServerLogs,
+                .downloadServerFiles, .uploadServerFiles, .deleteServerFiles
+            ]
+        )
+    }
 
     /// Read the default permissions from the given database.
     static func defaults(on db: Database) async throws -> Permissions? {
@@ -44,11 +46,13 @@ extension Permissions {
             .first()
     }
 
-    fileprivate static var all = Permissions(
-        application: .init(rawValue: .max),
-        users: .init(rawValue: .max),
-        servers: .init(rawValue: .max)
-    )
+    fileprivate static var all: Permissions {
+        Permissions(
+            application: .init(rawValue: .max),
+            users: .init(rawValue: .max),
+            servers: .init(rawValue: .max)
+        )
+    }
 }
 
 extension Request {

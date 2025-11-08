@@ -49,8 +49,8 @@ extension DirectoryConfiguration {
         }
     }
     
-    func generateKeys(at path: URL) async {
-        await Shell.run("ssh-keygen -t rsa-sha2-256 -b 2048 -f \"\(path.path)\" -N \"mcmanager\"")
+    func generateKeys(at path: URL) async throws {
+        try await Shell.run("ssh-keygen -t rsa-sha2-256 -b 2048 -f \"\(path.path)\" -N \"mcmanager\"")
     }
     
     /// Path where the servers are stored
@@ -62,15 +62,17 @@ extension DirectoryConfiguration {
 }
 
 fileprivate enum Shell {
+
+    enum ShellError: Error {
+        case commandFailed(String)
+    }
+
     @discardableResult
-    static func run(_ command: String) async -> String {
-        await withCheckedContinuation { continuation in
-            let result = Commands.Bash.run(
-                .init(command),
-                environment: .global
-            )
+    static func run(_ command: String) async throws -> String {
+        try await withCheckedThrowingContinuation { continuation in
+            let result = Commands.Bash.run(.init(command))
             if result.isFailure {
-                continuation.resume(returning: result.errorOutput)
+                continuation.resume(throwing: ShellError.commandFailed(result.errorOutput))
                 return
             }
             continuation.resume(returning: result.output)

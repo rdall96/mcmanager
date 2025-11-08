@@ -55,8 +55,8 @@ struct FileUploadRequest: Codable {
     }
 }
 
-final class FileUploadSession {
-    
+final class FileUploadSession: @unchecked Sendable {
+
     private static let logger = Logger(label: "mcmanager-uploads")
     
     let request: Request

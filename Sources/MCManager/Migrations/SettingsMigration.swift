@@ -12,7 +12,7 @@ extension Settings {
     static var migrations: [AsyncMigration] {
         [
             CreateTable(),
-            AddServerSupportCacheTTLField(),
+            AddServerSupportCacheTTLField()
         ]
     }
     
@@ -39,7 +39,7 @@ extension Settings {
                     FieldKeys.serverSupportCacheTTLSeconds.rawValue,
                     .uint,
                     .required,
-                    .sql(.default(Settings.defaults.serverSupportCacheTTLSeconds)),
+                    .sql(.default(Settings.defaults.serverSupportCacheTTLSeconds))
                 )
                 .ignoreExisting()
                 .update()

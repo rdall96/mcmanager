@@ -100,7 +100,7 @@ fileprivate func setupKeys(_ app: Application) async throws {
     let privateKeyPath = try app.directory.privateKeyPath
     if !FileManager.default.fileExists(atPath: privateKeyPath.path) {
         app.logger.notice("Generating private key")
-        await app.directory.generateKeys(at: privateKeyPath)
+        try await app.directory.generateKeys(at: privateKeyPath)
     }
     let key = try String(contentsOfFile: privateKeyPath.path)
     let keySigner = JWTSigner.hs256(key: key)

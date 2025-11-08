@@ -9,7 +9,7 @@ import Fluent
 import JWT
 import Vapor
 
-final class SessionToken: Model, Content {
+final class SessionToken: Model, Content, @unchecked Sendable {
     static let schema = "tokens"
 
     enum FieldKeys: FieldKey {
