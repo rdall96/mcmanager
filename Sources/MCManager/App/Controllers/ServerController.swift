@@ -194,7 +194,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
             return nil
         }
         let cachedStatus = try await ServerStatusCache.find(serverID, on: database)
-        if let cachedStatus, !cachedStatus.isExpired {
+        if let cachedStatus, !settings.serverStatusCacheIsExpired(cachedStatus) {
             return cachedStatus
         }
         else {
@@ -203,7 +203,6 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
             // create a new cache
             let status = ServerStatusCache(
                 id: serverID,
-                ttl: settings.serverStatusCacheTTLSeconds,
                 info: try await manager.info(for: serverID),
                 stats: try await manager.stats(for: serverID)
             )
@@ -450,8 +449,14 @@ fileprivate extension Request {
 }
 
 fileprivate extension Settings {
+
     /// If the server status cache is enabled
     var serverStatusCacheIsEnabled: Bool { serverStatusCacheTTLSeconds > 0 }
+
+    /// Determine if the server runtime support cache is expired.
+    func serverStatusCacheIsExpired(_ cache: ServerStatusCache) -> Bool {
+        cache.createdAt.addingTimeInterval(TimeInterval(serverStatusCacheTTLSeconds)) < .now
+    }
 
     /// Determine if the server runtime support cache is expired.
     func serverSupportCacheIsExpired(_ cache: ServerRuntimeSupportCache) -> Bool {

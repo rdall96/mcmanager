@@ -12,7 +12,7 @@ final class ServerStatusCache: Model, Content {
     static let schema = "server_status_cache"
     
     enum FieldKeys: FieldKey {
-        case expiresAt = "expires_at"
+        case createdAt = "created_at"
         case infoData = "info"
         case metricsData = "metrics"
         case statsData = "stats"
@@ -21,10 +21,10 @@ final class ServerStatusCache: Model, Content {
     @ID(key: .id)
     // same as the server id
     var id: UUID?
-    
-    @Field(key: FieldKeys.expiresAt.rawValue)
-    var expiresAt: Date
-    
+
+    @Field(key: FieldKeys.createdAt.rawValue)
+    var createdAt: Date
+
     @Field(key: FieldKeys.infoData.rawValue)
     private var infoData: Data?
     
@@ -35,17 +35,15 @@ final class ServerStatusCache: Model, Content {
     
     init(
         id: UUID,
-        ttl: UInt,
+        createdAt: Date = .now,
         info: MCServer.Info,
         stats: MCServer.Stats
     ) {
         self.id = id
-        self.expiresAt = .now.addingTimeInterval(Double(ttl))
+        self.createdAt = createdAt
         self.infoData = try? JSONEncoder().encode(info)
         self.statsData = try? JSONEncoder().encode(stats)
     }
-    
-    var isExpired: Bool { expiresAt < .now }
     
     /// Cached `Server.Info` value
     var info: MCServer.Info? {

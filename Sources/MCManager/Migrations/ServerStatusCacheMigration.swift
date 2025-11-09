@@ -17,7 +17,7 @@ extension ServerStatusCache {
         func prepare(on database: any Database) async throws {
             try await database.schema(ServerStatusCache.schema)
                 .id()
-                .field(FieldKeys.expiresAt.rawValue, .datetime, .required)
+                .field(FieldKeys.createdAt.rawValue, .datetime, .required)
                 .field(FieldKeys.infoData.rawValue, .data, .required)
                 .field(FieldKeys.statsData.rawValue, .data, .required)
                 .ignoreExisting()
