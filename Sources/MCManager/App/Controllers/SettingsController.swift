@@ -32,7 +32,7 @@ struct SettingsController: MCManagerAPIRoute, RouteCollection {
     
     func update(req: Request) async throws -> HTTPStatus {
         guard try await req.userHasPermissions(for: .editSettings) else {
-            throw Abort(.unauthorized)
+            throw UserError.unauthorized
         }
         let settings = try req.content.decode(Settings.self)
         

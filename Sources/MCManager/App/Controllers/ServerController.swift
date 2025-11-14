@@ -89,7 +89,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
     
     func create(req: Request) async throws -> MCServer {
         guard try await req.userHasPermissions(for: .createServers) else {
-            throw Abort(.unauthorized)
+            throw UserError.unauthorized
         }
         let server = try req.content.decode(MCServer.self)
         try await ensureIsValid(server: server, on: req.db)
@@ -111,7 +111,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
     
     func update(req: Request) async throws -> MCServer {
         guard try await req.userHasPermissions(for: .editServers) else {
-            throw Abort(.unauthorized)
+            throw UserError.unauthorized
         }
         let serverRequest = try req.content.decode(MCServer.self)
         let server = try await req.server
@@ -129,28 +129,39 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         
         try await ensureIsValid(server: server, on: req.db)
         try await server.save(on: req.db)
-        try await manager.update(server: server)
+        do {
+            try await manager.update(server: server)
+        }
+        catch {
+            logger.error("Failed to update server runtime: \(error)")
+            try await server.restore(on: req.db)
+            throw error
+        }
         return server
     }
     
     func delete(req: Request) async throws -> HTTPStatus {
         guard try await req.userHasPermissions(for: .deleteServers) else {
-            throw Abort(.unauthorized)
+            throw UserError.unauthorized
         }
         let serverID = try req.serverID
         let server = try await req.server
-        
+
+        // Check if the server is running
+        if try await manager.info(for: serverID).status == .running {
+            throw MCServerError.invalidAction(.serverIsRunning)
+        }
+
         try await server.delete(on: req.db)
         do {
             try await manager.deleteServer(id: serverID)
         }
         catch {
-            logger.critical("Failed to delete server from disk, attempting to restore it")
+            logger.critical("Failed to delete server from disk, attempting to restore it. \(error)")
             try await server.restore(on: req.db)
             throw error
         }
-        try? await ServerStatusCache.find(serverID, on: req.db)?
-            .delete(on: req.db)
+        await deleteStatusCache(for: serverID, on: req.db)
         return .noContent
     }
     
@@ -158,7 +169,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
     
     func support(req: Request) async throws -> [MCServer.RuntimeSupport] {
         guard try await req.userHasPermissions(for: .createServers) else {
-            throw Abort(.unauthorized)
+            throw UserError.unauthorized
         }
 
         // Check if we have cached values for the runtime support
@@ -197,18 +208,23 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         if let cachedStatus, !settings.serverStatusCacheIsExpired(cachedStatus) {
             return cachedStatus
         }
-        else {
-            // delete any previous cached status
-            try await cachedStatus?.delete(on: database)
-            // create a new cache
-            let status = ServerStatusCache(
+        // delete any previous cached status
+        try await cachedStatus?.delete(on: database)
+        // create a new cache
+        let status: ServerStatusCache
+        do {
+            status = ServerStatusCache(
                 id: serverID,
                 info: try await manager.info(for: serverID),
                 stats: try await manager.stats(for: serverID)
             )
-            try await status.save(on: database)
-            return status
         }
+        catch {
+            logger.error("Failed to fetch server info or stats: \(error)")
+            throw error
+        }
+        try await status.save(on: database)
+        return status
     }
     
     func info(req: Request) async throws -> MCServer.Info {
@@ -231,64 +247,64 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
     
     func defaultProperties(req: Request) async throws -> MCServer.Properties {
         guard try await req.userHasPermissions(for: .readServerProperties) else {
-            throw Abort(.unauthorized)
+            throw UserError.unauthorized
         }
         return MCServer.Properties.defaults
     }
     
     func properties(req: Request) async throws -> MCServer.Properties {
         guard try await req.userHasPermissions(for: .readServerProperties) else {
-            throw Abort(.unauthorized)
+            throw UserError.unauthorized
         }
         let serverID = try req.serverID
         return try await manager.properties(for: serverID)
     }
     
-    func updateProperties(req: Request) async throws -> HTTPStatus {
+    func updateProperties(req: Request) async throws -> MCServer.Properties {
         guard try await req.userHasPermissions(for: .editServerProperties) else {
-            throw Abort(.unauthorized)
+            throw UserError.unauthorized
         }
         let serverID = try req.serverID
         let properties = try req.content.decode(MCServer.Properties.self)
         try await manager.updateProperties(properties, for: serverID)
-        return .ok
+        return try await manager.properties(for: serverID)
     }
     
     // MARK: - Execution
     
     func start(req: Request) async throws -> HTTPStatus {
         guard try await req.userHasPermissions(for: .startStopServers) else {
-            throw Abort(.unauthorized)
+            throw UserError.unauthorized
         }
         let serverID = try req.serverID
         let settings = try await settings(on: req.db)
         guard await manager.runningServersCount < settings.maxRunningServers else {
-            throw Abort(.serviceUnavailable, reason: "Reached maximum number of running servers")
+            throw MCServerError.invalidAction(.tooManyRunningServers)
         }
         try await manager.startServer(with: serverID)
         // invalidate the status cache
-        try await ServerStatusCache.find(serverID, on: req.db)?.delete(on: req.db)
+        await deleteStatusCache(for: serverID, on: req.db)
         return .ok
     }
     
     func stop(req: Request) async throws -> HTTPStatus {
         guard try await req.userHasPermissions(for: .startStopServers) else {
-            throw Abort(.unauthorized)
+            throw UserError.unauthorized
         }
         let serverID = try req.serverID
         try await manager.stopServer(with: serverID)
         // invalidate the status cache
-        try await ServerStatusCache.find(serverID, on: req.db)?.delete(on: req.db)
+        await deleteStatusCache(for: serverID, on: req.db)
         return .ok
     }
     
     func command(req: Request) async throws -> HTTPStatus {
         guard try await req.userHasPermissions(for: .sendServerCommands) else {
-            throw Abort(.unauthorized)
+            throw UserError.unauthorized
         }
         let serverID = try req.serverID
         guard let command = try? req.content.decode(String.self) else {
-            throw Abort(.badRequest, reason: "Missing command in request body")
+            throw MCServerError.invalidAction(.invalidCommand)
         }
         try await manager.sendCommand(command, to: serverID)
         return .ok
@@ -296,7 +312,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
     
     func logs(req: Request) async throws -> [String] {
         guard try await req.userHasPermissions(for: .readServerLogs) else {
-            throw Abort(.unauthorized)
+            throw UserError.unauthorized
         }
         let serverID = try req.serverID
         var tail: UInt? = nil
@@ -310,17 +326,10 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
     
     func download(req: Request) async throws -> Response {
         guard try await req.userHasPermissions(for: .downloadServer) else {
-            throw Abort(.unauthorized)
+            throw UserError.unauthorized
         }
         let serverID = try req.serverID
-        let fileURL: URL
-        do {
-            fileURL = try await manager.downloadServer(with: serverID)
-        }
-        catch MCServerError.invalidServerId {
-            throw Abort(.notFound, reason: "The requested server does not exist")
-        }
-        
+        let fileURL = try await manager.downloadServer(with: serverID)
         let downloadSession = try FileDownloadSession(for: req, url: fileURL)
         return downloadSession.get()
     }
@@ -329,7 +338,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         let serverID = try req.serverID
         let relativePath = req.query[String.self, at: "path"]
         if try await manager.file(at: relativePath ?? "", from: serverID) == nil {
-            throw Abort(.notFound)
+            throw MCServerError.invalidAction(.fileDoesNotExist)
         }
         return FileBrowser(
             relativePath: relativePath,
@@ -339,7 +348,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
     
     func uploadFile(req: Request) async throws -> HTTPStatus {
         guard try await req.userHasPermissions(for: .uploadServerFiles) else {
-            throw Abort(.unauthorized)
+            throw UserError.unauthorized
         }
         let serverID = try req.serverID
         
@@ -351,8 +360,8 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
             uploadedFileURL = try await uploadSession.get()
         }
         catch {
-            logger.error("Failed to upload file")
-            throw Abort(.internalServerError, reason: "Failed to upload file")
+            logger.error("Failed to upload file: \(error)")
+            throw MCServerError.systemError(error)
         }
         
         try await manager.saveFile(
@@ -366,14 +375,12 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
     
     func removeFile(req: Request) async throws -> HTTPStatus {
         guard try await req.userHasPermissions(for: .deleteServerFiles) else {
-            throw Abort(.unauthorized)
+            throw UserError.unauthorized
         }
         let serverID = try req.serverID
-        guard let relativePath = req.query[String.self, at: "path"] else {
-            throw Abort(.badRequest, reason: "Missing file path to remove in request query")
-        }
-        if try await manager.file(at: relativePath, from: serverID) == nil {
-            throw Abort(.notFound, reason: "The specified file path does not exist")
+        guard let relativePath = req.query[String.self, at: "path"],
+              try await manager.file(at: relativePath, from: serverID) != nil else {
+            throw MCServerError.invalidAction(.fileDoesNotExist)
         }
         try await manager.removeFile(at: relativePath, for: serverID)
         return .ok
@@ -381,16 +388,13 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
     
     func downloadFile(req: Request) async throws -> Response {
         guard try await req.userHasPermissions(for: .downloadServerFiles) else {
-            throw Abort(.unauthorized)
+            throw UserError.unauthorized
         }
         let serverID = try req.serverID
-        guard let relativePath = req.query[String.self, at: "path"] else {
-            throw Abort(.badRequest, reason: "Missing path of file to download in request query")
+        guard let relativePath = req.query[String.self, at: "path"],
+              let fileURL = try await manager.file(at: relativePath, from: serverID) else {
+            throw MCServerError.invalidAction(.fileDoesNotExist)
         }
-        guard let fileURL = try await manager.file(at: relativePath, from: serverID) else {
-            throw Abort(.notFound, reason: "The specified file path does not exist")
-        }
-        
         let downloadSession = try FileDownloadSession(for: req, url: fileURL)
         return downloadSession.get()
     }
@@ -419,9 +423,19 @@ extension ServerController {
         let settings = try await settings(on: database)
         // check the server port
         if !settings.allowedServerPortsData.contains(server.port) {
-            throw Abort(.badRequest, reason: "Server port not in allowed range")
+            throw MCServerError.invalidPort(server.port)
         }
         // TODO: check the server version against the supported runtimes?
+    }
+
+    /// Wipe the status cache for the given server.
+    func deleteStatusCache(for serverID: MCServer.IDValue, on database: Database) async {
+        do {
+            try await ServerStatusCache.find(serverID, on: database)?.delete(on: database)
+        }
+        catch {
+            logger.error("Failed to delete server status cache for \(serverID): \(error)")
+        }
     }
 }
 
@@ -429,10 +443,11 @@ fileprivate extension Request {
     
     var serverID: UUID {
         get throws {
-            guard let id = self.parameters.get("serverID"),
-                  let uuid = UUID(uuidString: id)
-            else {
-                throw Abort(.badRequest, reason: "Missing server ID in request path")
+            guard let id = self.parameters.get("serverID") else {
+                throw MCServerError.invalidID(nil)
+            }
+            guard let uuid = UUID(uuidString: id) else {
+                throw MCServerError.invalidID(id)
             }
             return uuid
         }
@@ -440,8 +455,10 @@ fileprivate extension Request {
     
     var server: MCServer {
         get async throws {
-            guard let server = try await MCServer.find(try serverID, on: self.db) else {
-                throw Abort(.notFound, reason: "The requested server does not exist")
+            let serverID = try serverID
+            let server = try await MCServer.find(serverID, on: self.db)
+            guard let server else {
+                throw MCServerError.notFound(serverID)
             }
             return server
         }

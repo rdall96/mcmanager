@@ -5,7 +5,6 @@ import JWT
 import Vapor
 
 fileprivate let defaultAPIPort: Int = 8000
-fileprivate let defaultUIPort: Int = 3000
 
 // configures your application
 public func configure(_ app: Application) async throws {
@@ -33,9 +32,13 @@ public func configure(_ app: Application) async throws {
     
     // Security
     try await setupKeys(app)
-    
-    // Add CORS
-    addCorsMiddleware(to: app)
+
+    // Add error middleware
+    app.middleware.use(ApplicationErrorMiddleware())
+
+    // Add CORS (unused)
+    // cors middleware should come before any error middleware using `at: .beginning`
+    app.middleware.use(WebAppCORSMiddleware(), at: .beginning)
     
     // Register routes
     try await routes(app)
@@ -110,33 +113,4 @@ fileprivate func setupKeys(_ app: Application) async throws {
 extension JWKIdentifier {
     static let `public` = JWKIdentifier(string: "public")
     static let `private` = JWKIdentifier(string: "private")
-}
-
-// MARK: - Middleware
-
-fileprivate func addCorsMiddleware(to app: Application) {
-    let corsConfiguration = CORSMiddleware.Configuration(
-        allowedOrigin: .defaultFrontend,
-        allowedMethods: [.GET, .POST, .PUT, .DELETE],
-        allowedHeaders: [.accept, .authorization, .contentType, .origin, .xRequestedWith, .userAgent, .accessControlAllowOrigin],
-        allowCredentials: true
-    )
-    let cors = CORSMiddleware(configuration: corsConfiguration)
-    // cors middleware should come before default error middleware using `at: .beginning`
-    app.middleware.use(cors, at: .beginning)
-}
-
-extension CORSMiddleware.AllowOriginSetting {
-    static var defaultFrontend: Self {
-        var port: Int = defaultUIPort
-        if let uiPortValue = Environment.get("WEB_APP_PORT"),
-           let customUIPort = Int(uiPortValue) {
-            port = customUIPort
-        }
-        
-        return .any([
-            "127.0.0.1:\(port)",
-            "http://localhost:\(port)"
-        ])
-    }
 }

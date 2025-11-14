@@ -25,7 +25,7 @@ enum TestData {
             .compactMap { MCServer.Version(string: $0) }
     }
     
-    static var ports: [UInt16] {
+    static var ports: [MCServer.Port] {
         (25500...25599).map { $0 }
     }
     

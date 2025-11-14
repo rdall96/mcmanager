@@ -24,7 +24,7 @@ final actor ServerRuntime: Identifiable {
     /// Version of Minecraft
     private(set) var version: String
     /// Port this server is hosted on
-    private(set) var port: UInt16
+    private(set) var port: MCServer.Port
     /// Minecraft server properties
     var properties: MCServer.Properties
     /// Status of the Minecraft server
@@ -36,7 +36,7 @@ final actor ServerRuntime: Identifiable {
     
     init(info: MCServer, rootPath: URL, logger: Logger? = nil) async throws {
         guard let id = info.id else {
-            throw MCServerError.invalidServerId
+            throw MCServerError.invalidID(info.id)
         }
         self.id = id
         self.logger = logger ?? Logger(label: "mcmanager.server.\(id.uuidString)")
@@ -71,8 +71,8 @@ final actor ServerRuntime: Identifiable {
                 processNeedsUpdate = true
             }
             catch {
-                logger?.critical("Failed to create server \(id.uuidString) due to a docker error: \(error)")
-                throw MCServerError.creationError
+                self.logger.critical("Failed to create server \(id.uuidString). \(error)")
+                throw MCServerError.systemError(error)
             }
         }
         
@@ -91,7 +91,7 @@ final actor ServerRuntime: Identifiable {
     
     func update(_ info: MCServer) throws {
         guard let id = info.id, self.id == id else {
-            throw MCServerError.invalidServerId
+            throw MCServerError.invalidID(info.id)
         }
         version = info.version.description
         port = info.port
@@ -109,7 +109,8 @@ final actor ServerRuntime: Identifiable {
             try FileManager.default.removeItem(at: path)
         }
         catch {
-            throw MCServerError.deletionError(error.localizedDescription)
+            logger.error("Failed to delete server: \(error)")
+            throw MCServerError.systemError(error)
         }
     }
     
@@ -122,7 +123,7 @@ final actor ServerRuntime: Identifiable {
         }
         catch {
             logger.error("Failed to update server properties: \(error)")
-            throw MCServerError.updateFailed(error)
+            throw MCServerError.systemError(error)
         }
         // Signal that we need to update the process the next time it starts
         processNeedsUpdate = true
@@ -164,7 +165,7 @@ final actor ServerRuntime: Identifiable {
     
     nonisolated func saveFile(at url: URL, to relativePath: String) async throws {
         if await isRunning {
-            throw MCServerError.executionError("Can't add a file to the server while it's running")
+            throw MCServerError.invalidAction(.serverIsRunning)
         }
         do {
             try FileManager.default.copyItem(
@@ -184,7 +185,7 @@ final actor ServerRuntime: Identifiable {
             try FileManager.default.removeItem(at: path.appendingPathComponent(relativePath))
         }
         catch {
-            logger.error("Failed to delete file: \(error)")
+            logger.error("Failed to delete file at \(relativePath): \(error)")
             throw MCServerError.systemError(error)
         }
     }
@@ -205,7 +206,7 @@ final actor ServerRuntime: Identifiable {
                 return try await Docker.status(of: process)
             }
             catch {
-                logger.critical("Failed to fetch container status from docker: \(error)")
+                logger.critical("Failed to fetch container status: \(error)")
                 return .unknown
             }
         }
@@ -237,14 +238,14 @@ final actor ServerRuntime: Identifiable {
     }
     
     private func ensureIsRunning() async throws {
-        if !(await isRunning) {
-            throw MCServerError.executionError("The server is not running")
+        guard await isRunning else {
+            throw MCServerError.invalidAction(.serverIsStopped)
         }
     }
     
     private func ensureIsStopped() async throws {
         if await isRunning {
-            throw MCServerError.serverIsRunning
+            throw MCServerError.invalidAction(.serverIsRunning)
         }
     }
     
@@ -322,10 +323,9 @@ final actor ServerRuntime: Identifiable {
             }
             catch {
                 status = .error
-                logger.critical("Failed to re-create server process: \(error)")
-                throw MCServerError.runtimeError(error)
+                logger.critical("Failed to re-create container: \(error)")
+                throw MCServerError.systemError(error)
             }
-            processNeedsUpdate = false
         }
         
         // update status manually to notify the server is starting
@@ -336,10 +336,11 @@ final actor ServerRuntime: Identifiable {
         catch {
             status = .error
             logger.critical("Failed to start server: \(error)")
-            throw MCServerError.runtimeError(error)
+            throw MCServerError.systemError(error)
         }
         Task(priority: .background) {
             await waitForStatus(.running)
+            processNeedsUpdate = false
         }
     }
     
@@ -354,7 +355,7 @@ final actor ServerRuntime: Identifiable {
         catch {
             status = .error
             logger.critical("Failed to send stop command to the server: \(error)")
-            throw MCServerError.runtimeError(error)
+            throw MCServerError.systemError(error)
         }
         Task(priority: .background) {
             await waitForStatus(.stopped)
@@ -381,14 +382,14 @@ final actor ServerRuntime: Identifiable {
             .first
         guard let pid else {
             logger.critical("No process ID found for running server to send command")
-            throw MCServerError.failedToSendCommand
+            throw MCServerError.unknown
         }
         do {
             try await Docker.exec("/bin/bash -c \"echo \(command.sanitized) > /proc/\(pid)/fd/0\"", in: process)
         }
         catch {
             logger.error("Failed to send server command: \(error)")
-            throw MCServerError.runtimeError(error)
+            throw MCServerError.systemError(error)
         }
     }
     
@@ -398,7 +399,7 @@ final actor ServerRuntime: Identifiable {
         }
         catch {
             logger.error("Failed to get server logs: \(error)")
-            throw MCServerError.runtimeError(error)
+            throw MCServerError.systemError(error)
         }
     }
     
@@ -443,7 +444,7 @@ final actor ServerRuntime: Identifiable {
             }
             catch {
                 logger.critical("Failed to fetch server stats from docker: \(error)")
-                throw MCServerError.runtimeError(error)
+                throw MCServerError.systemError(error)
             }
             return MCServer.Stats(cpuPercent: stats.cpuPercent, memoryUsage: stats.memoryUsageBytes)
         }
@@ -489,7 +490,7 @@ extension ServerRuntime {
         ]
         
         /// Default Minecraft server port on the container
-        static let minecraftServerPort: UInt16 = 25565
+        static let minecraftServerPort: MCServer.Port = 25565
         
         /// Name of the Minecraft server process in the docker container
         static let serverProcessName = "start_server"

@@ -27,9 +27,9 @@ struct AuthenticationController: MCManagerAPIRoute, RouteCollection {
     
     /// Login request
     func login(req: Request) async throws -> ClientSession {
-        let user = try req.auth.require(User.self)
+        let user = try requireAuthenticated(for: req)
         guard let payload = try SessionToken.token(for: user) else {
-            throw Abort(.unauthorized, reason: "Invalid credentials")
+            throw AuthenticationError.invalidCredentials
         }
         try await payload.save(on: req.db)
         let token = try req.jwt.sign(payload)
@@ -38,7 +38,7 @@ struct AuthenticationController: MCManagerAPIRoute, RouteCollection {
     
     /// Logout the current session
     func logout(req: Request) async throws -> HTTPStatus {
-        let user = try req.auth.require(User.self)
+        let user = try requireAuthenticated(for: req)
         // delete any existing session for this user
         try await SessionToken.query(on: req.db)
             .filter(\.$user.$id, .equal, try user.requireID())
@@ -67,7 +67,7 @@ struct AuthenticationController: MCManagerAPIRoute, RouteCollection {
         }
         catch {
             logger.error("Failed to get local public signing key: \(error)")
-            throw Abort(.internalServerError)
+            throw Abort(.internalServerError, reason: "Invalid signing key!")
         }
     }
 }

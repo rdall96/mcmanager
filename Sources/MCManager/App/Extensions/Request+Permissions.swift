@@ -58,32 +58,52 @@ extension Permissions {
 extension Request {
     
     /// Get the permissions of the user making the request
-    var userPermissions: Permissions? {
+    var userPermissions: Permissions {
         get async throws {
-            let user = try auth.require(User.self)
-            
+            let user: User
+            do {
+                user = try auth.require(User.self)
+            }
+            catch {
+                throw AuthenticationError.notAuthenticated
+            }
+
             // admins can do whatever they want
             if user.isAdmin { return .all }
             
             // grab the user role and check the permissions there
             // users without an assigned role, get default permissions
-            let defaultPermissions = try await Permissions.defaults(on: db)
+            let defaultPermissions: Permissions
+            do {
+                defaultPermissions = try await Permissions.defaults(on: db) ?? .defaults
+            }
+            catch {
+                throw UserError.unknown
+            }
             guard let roleID = user.$role.id else {
                 return defaultPermissions
             }
-            return try await Role.find(roleID, on: db)?.permissions ?? defaultPermissions
+
+            var permissions: Permissions?
+            do {
+                permissions = try await Role.find(roleID, on: db)?.permissions
+            }
+            catch {
+                throw RoleError.notFound(roleID)
+            }
+            return permissions ?? defaultPermissions
         }
     }
     
     func userHasPermissions(for action: Permissions.Application) async throws -> Bool {
-        try await userPermissions?.application.contains(action) ?? false
+        try await userPermissions.application.contains(action)
     }
     
     func userHasPermissions(for action: Permissions.Users) async throws -> Bool {
-        try await userPermissions?.users.contains(action) ?? false
+        try await userPermissions.users.contains(action)
     }
     
     func userHasPermissions(for action: Permissions.Servers) async throws -> Bool {
-        try await userPermissions?.servers.contains(action) ?? false
+        try await userPermissions.servers.contains(action)
     }
 }

@@ -81,7 +81,7 @@ extension MCServer.Properties {
             return try PropertyListDecoder().decode(Self.self, from: data)
         }
         catch {
-            throw MCServerError.corruptedServerProperties(url, error)
+            throw MCServerError.systemError(error)
         }
     }
     

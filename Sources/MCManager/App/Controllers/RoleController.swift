@@ -108,17 +108,13 @@ struct RoleController: MCManagerAPIRoute, RouteCollection {
     
     func defaultPermissions(req: Request) async throws -> Permissions {
         try requireAdmin(for: req) // only admins can manage default permissions
-        return try await Permissions.query(on: req.db)
-            .filter(\Permissions.$isDefaults, .equal, true)
-            .first() ?? .defaults
+        return try await Permissions.defaults(on: req.db) ?? .defaults
     }
     
     func editDefaultPermissions(req: Request) async throws -> Permissions {
         try requireAdmin(for: req) // only admins can manage default permissions
         let updatedPermissions = try req.content.decode(Permissions.self)
-        let defaultPermissions = try await Permissions.query(on: req.db)
-            .filter(\Permissions.$isDefaults, .equal, true)
-            .first() ?? .defaults
+        let defaultPermissions = try await Permissions.defaults(on: req.db) ?? .defaults
         defaultPermissions.update(with: updatedPermissions)
         try await defaultPermissions.save(on: req.db)
         return updatedPermissions
@@ -128,11 +124,25 @@ struct RoleController: MCManagerAPIRoute, RouteCollection {
 // MARK: - Helpers
 
 fileprivate extension Request {
+
+    var roleID: UUID {
+        get throws {
+            guard let id = self.parameters.get("roleID") else {
+                throw RoleError.missingID
+            }
+            guard let uuid = UUID(uuidString: id) else {
+                throw RoleError.invalidID(id)
+            }
+            return uuid
+        }
+    }
+
     var role: Role {
         get async throws {
-            let role = try await Role.find(self.parameters.get("roleID"), on: self.db)
+            let roleID = try roleID
+            let role = try await Role.find(roleID, on: self.db)
             guard let role else {
-                throw Abort(.notFound, reason: "The requested role does not exist")
+                throw RoleError.notFound(roleID)
             }
             return role
         }

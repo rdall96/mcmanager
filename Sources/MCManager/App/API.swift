@@ -13,10 +13,23 @@ protocol MCManagerAPIRoute {
 }
 
 extension MCManagerAPIRoute {
-    func requireAdmin(for req: Request) throws {
-        guard try req.auth.require(User.self).isAdmin else {
-            throw Abort(.unauthorized)
+
+    func requireAuthenticated(for req: Request) throws -> User {
+        do {
+            return try req.auth.require(User.self)
         }
+        catch {
+            throw AuthenticationError.notAuthenticated
+        }
+    }
+
+    @discardableResult
+    func requireAdmin(for req: Request) throws -> User {
+        let user = try requireAuthenticated(for: req)
+        guard user.isAdmin else {
+            throw UserError.unauthorized
+        }
+        return user
     }
 }
 

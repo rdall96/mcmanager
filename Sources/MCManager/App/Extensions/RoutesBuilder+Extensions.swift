@@ -14,14 +14,14 @@ extension RoutesBuilder {
     func requireUserCredentials() -> any RoutesBuilder {
         return self
             .grouped(User.asyncCredentialsAuthenticator())
-            .grouped(User.guardMiddleware())
+            .grouped(User.guardMiddleware(throwing: AuthenticationError.invalidCredentials))
     }
     
     /// This route requires the user to be authenticated
     func requireAuthentication() -> any RoutesBuilder {
         return self
             .grouped(SessionToken.Authenticator())
-            .grouped(User.guardMiddleware())
+            .grouped(User.guardMiddleware(throwing: AuthenticationError.notAuthenticated))
     }
     
     /// Group routes by the API version

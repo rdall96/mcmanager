@@ -11,8 +11,8 @@ import Vapor
 final class Settings: Model, Content {
     static let schema = "settings"
     
-    static let validPortRange: ClosedRange<UInt16> = 1024...65535
-    
+    static let validPortRange: ClosedRange<MCServer.Port> = 1024...65535
+
     enum FieldKeys: FieldKey {
         case serverStatusCacheTTLSeconds = "server_status_cache_ttl_seconds"
         case serverSupportCacheTTLSeconds = "server_support_cache_ttl_seconds"
@@ -64,19 +64,19 @@ final class Settings: Model, Content {
         self.maxRunningServers = maxRunningServers
     }
     
-    var allowedServerPortsData: Set<UInt16> {
-        var ports = Set<UInt16>()
+    var allowedServerPortsData: Set<MCServer.Port> {
+        var ports = Set<MCServer.Port>()
         for portValue in allowedServerPorts.split(separator: ",") {
             // if the portValue contains a `-` then it's a range, otherwise it's a single value
             if portValue.contains("-") {
                 let portRangeValues = portValue.split(separator: "-", maxSplits: 1)
-                guard let lowerBound = UInt16(portRangeValues[0]),
-                      let upperBound = UInt16(portRangeValues[1])
+                guard let lowerBound = MCServer.Port(portRangeValues[0]),
+                      let upperBound = MCServer.Port(portRangeValues[1])
                 else { continue }
                 ports.formUnion(lowerBound...upperBound)
             }
             else {
-                guard let port = UInt16(portValue) else { continue }
+                guard let port = MCServer.Port(portValue) else { continue }
                 ports.insert(port)
             }
         }

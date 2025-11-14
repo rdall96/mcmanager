@@ -10,6 +10,8 @@ import Fluent
 import Vapor
 
 final class MCServer: Model, Content {
+    typealias Port = UInt16
+
     static let schema = "servers"
     
     enum FieldKeys: FieldKey {
@@ -35,8 +37,8 @@ final class MCServer: Model, Content {
     var version: Version
     
     @Field(key: FieldKeys.port.rawValue)
-    var port: UInt16
-    
+    var port: Port
+
     @Field(key: FieldKeys.createdAt.rawValue)
     var createdAt: Date
     
@@ -50,7 +52,7 @@ final class MCServer: Model, Content {
         name: String,
         type: ServerType,
         version: Version,
-        port: UInt16
+        port: Port
     ) {
         self.id = id
         self.name = name
@@ -65,7 +67,7 @@ final class MCServer: Model, Content {
         name: String,
         type: ServerType,
         version: Version,
-        port: UInt16
+        port: Port
     ) {
         self.init(
             id: UUID(),
@@ -95,7 +97,7 @@ final class MCServer: Model, Content {
             name: try container.decodeIfPresent(String.self, forKey: .name) ?? "A Minecraft Server",
             type: try container.decodeIfPresent(ServerType.self, forKey: .type) ?? .java,
             version: try container.decodeIfPresent(Version.self, forKey: .version) ?? .none,
-            port: try container.decodeIfPresent(UInt16.self, forKey: .port) ?? 25565
+            port: try container.decodeIfPresent(Port.self, forKey: .port) ?? 25565
         )
     }
 }

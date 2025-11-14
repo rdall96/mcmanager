@@ -91,7 +91,7 @@ final class FileUploadSession: @unchecked Sendable {
             self.processUpload(fileHandle: $0)
         }.get()
         guard result else {
-            throw Abort(.internalServerError)
+            throw Abort(.internalServerError, reason: "Failed to read file.")
         }
         
         // Read the saved file and check it's validity
@@ -99,7 +99,7 @@ final class FileUploadSession: @unchecked Sendable {
         let sha256 = Array(Crypto.SHA256.hash(data: data).makeIterator())
             .map { String(format: "%02x", $0) }.joined()
         guard sha256 == checksum else {
-            throw Abort(.badRequest)
+            throw Abort(.badRequest, reason: "Invalid file checksum.")
         }
         
         if isCompressed {

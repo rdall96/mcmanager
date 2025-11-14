@@ -104,15 +104,20 @@ extension SessionToken: JWTPayload {
 extension SessionToken {
     struct Authenticator: AsyncBearerAuthenticator {
         func authenticate(bearer: BearerAuthorization, for request: Request) async throws {
-            // ensure it's the right type of jwt (this will also ensure it's signed correctly)
-            let jwt = try request.jwt.verify(as: SessionToken.self)
-            // ensure this token exists on the database
-            let storedJwt = try await SessionToken.find(jwt.id, on: request.db)
-            guard let storedJwt, try storedJwt.requireID() == jwt.id else {
-                throw Abort(.unauthorized)
+            do {
+                // ensure it's the right type of jwt (this will also ensure it's signed correctly)
+                let jwt = try request.jwt.verify(as: SessionToken.self)
+                // ensure this token exists on the database
+                let storedJwt = try await SessionToken.find(jwt.id, on: request.db)
+                guard let storedJwt, try storedJwt.requireID() == jwt.id else {
+                    throw Abort(.unauthorized)
+                }
+                let user = try await storedJwt.$user.get(on: request.db)
+                request.auth.login(user)
             }
-            let user = try await storedJwt.$user.get(on: request.db)
-            request.auth.login(user)
+            catch {
+                throw AuthenticationError.notAuthenticated
+            }
         }
     }
 }

@@ -70,14 +70,14 @@ final class MCServerManager {
     
     private func requireServer(_ server: MCServer) throws -> UUID {
         guard let uuid = server.id, serverRuntimes[uuid] != nil else {
-            throw MCServerError.invalidServerId
+            throw MCServerError.invalidID(server.id)
         }
         return uuid
     }
     
     private func requireServer(id uuid: UUID) throws -> ServerRuntime {
         guard let serverRuntime = serverRuntimes[uuid] else {
-            throw MCServerError.invalidServerId
+            throw MCServerError.invalidID(uuid)
         }
         return serverRuntime
     }
@@ -86,11 +86,11 @@ final class MCServerManager {
     func add(server: MCServer) async throws {
         // ensure this server doesn't already exist
         guard let serverID = server.id else {
-            throw MCServerError.creationError
+            throw MCServerError.invalidID(server.id)
         }
         guard serverRuntimes[serverID] == nil else {
-            logger.error("Attempted to add a server with a duplicate id \"\(serverID)\"")
-            throw MCServerError.duplicateServer(serverID)
+            logger.error("Attempted to add a server with a duplicate id: \(serverID)")
+            throw MCServerError.invalidAction(.serverAlreadyExists)
         }
         let runtime = try await ServerRuntime(
             info: server,
@@ -192,14 +192,14 @@ final class MCServerManager {
     func startServer(with serverID: UUID) async throws {
         let server = try requireServer(id: serverID)
         if await server.isRunning {
-            throw MCServerError.serverIsRunning
+            throw MCServerError.invalidAction(.serverIsRunning)
         }
         // check if this port is already in use by another running server
         let serverPort = await server.port
         for runtime in serverRuntimes.values {
             if await runtime.isRunning, await runtime.port == serverPort {
                 logger.warning("Did not start server \(serverID) because another server is uring the same port \(serverPort)")
-                throw MCServerError.executionError("This port is already in use by another server")
+                throw MCServerError.invalidAction(.portAlreadyInUse)
             }
         }
         try await server.start()
@@ -228,7 +228,7 @@ final class MCServerManager {
     func downloadServer(with serverID: UUID) async throws -> URL {
         let server = try requireServer(id: serverID)
         if await server.isRunning {
-            throw MCServerError.serverIsRunning
+            throw MCServerError.invalidAction(.serverIsRunning)
         }
         return server.path
     }

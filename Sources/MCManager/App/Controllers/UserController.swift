@@ -31,7 +31,7 @@ struct UserController: MCManagerAPIRoute, RouteCollection {
     /// List all users
     func all(req: Request) async throws -> [User] {
         guard try await req.userHasPermissions(for: .readUsers) else {
-            throw Abort(.unauthorized)
+            throw UserError.unauthorized
         }
         return try await User.query(on: req.db).all()
     }
@@ -39,13 +39,24 @@ struct UserController: MCManagerAPIRoute, RouteCollection {
     /// Create a new user
     func create(req: Request) async throws -> User {
         guard try await req.userHasPermissions(for: .createUsers) else {
-            throw Abort(.unauthorized)
+            throw UserError.unauthorized
         }
         let userRequest = try req.content.decode(User.self)
-        // only admins can create other admins
+
+        // Only admins can create other admins
         if userRequest.isAdmin, !(try req.currentUser.isAdmin) {
-            throw Abort(.forbidden, reason: "Only admins can create other admins")
+            throw UserError.adminRequired
         }
+
+        // Check if a user with this username already exists
+        let existingUser = try await User.query(on: req.db)
+            .filter(\.$username, .equal, userRequest.username)
+            .first()
+        guard existingUser == nil else {
+            logger.error("Attempted to create user with duplicated username: \(userRequest.username)")
+            throw UserError.alreadyExists
+        }
+
         // This new user will now need its password encrypted before saving
         let newUser = try User(
             username: userRequest.username,
@@ -53,7 +64,13 @@ struct UserController: MCManagerAPIRoute, RouteCollection {
             isAdmin: userRequest.isAdmin,
             roleID: userRequest.$role.id
         )
-        try await newUser.save(on: req.db)
+        do {
+            try await newUser.save(on: req.db)
+        }
+        catch {
+            logger.critical("Faield to create new user: \(error)")
+            throw UserError.unknown
+        }
         return newUser
     }
     
@@ -63,7 +80,7 @@ struct UserController: MCManagerAPIRoute, RouteCollection {
         let user = try await req.user
         let hasPermissions = try await req.userHasPermissions(for: .readUsers)
         guard try user.isCurrentUser(for: req) || hasPermissions else {
-            throw Abort(.unauthorized)
+            throw UserError.unauthorized
         }
         return user
     }
@@ -78,12 +95,12 @@ struct UserController: MCManagerAPIRoute, RouteCollection {
         let user = try await req.user
         let hasPermissions = try await req.userHasPermissions(for: .editUsers)
         guard try user.isCurrentUser(for: req) || hasPermissions else {
-            throw Abort(.unauthorized)
+            throw UserError.unauthorized
         }
         
         // only the super admin can edit itself
         if user.isAdmin, !(try user.isCurrentUser(for: req)), !(try req.currentUser.isSuperAdmin) {
-            throw Abort(.forbidden, reason: "You can't edit an admin user")
+            throw UserError.unauthorized
         }
         
         let userRequest = try req.content.decode(User.self)
@@ -97,12 +114,11 @@ struct UserController: MCManagerAPIRoute, RouteCollection {
         let user = try await req.user
         let hasPermissions = try await req.userHasPermissions(for: .deleteUsers)
         guard try user.isCurrentUser(for: req) || hasPermissions else {
-            throw Abort(.unauthorized)
+            throw UserError.unauthorized
         }
         // the superuser cannot be deleted
         if user.isSuperAdmin {
-            logger.error("Attempted to delete default admin user, operation not allowed")
-            throw Abort(.forbidden, reason: "The super admin user cannot be deleted")
+            throw UserError.cantDeleteAdmin
         }
         
         // delete existing user sessions
@@ -122,10 +138,11 @@ fileprivate extension Request {
     
     var userID: UUID {
         get throws {
-            guard let id = self.parameters.get("userID"),
-                  let uuid = UUID(uuidString: id)
-            else {
-                throw Abort(.badRequest, reason: "Missing user ID in request path")
+            guard let id = self.parameters.get("userID") else {
+                throw UserError.missingID
+            }
+            guard let uuid = UUID(uuidString: id) else {
+                throw UserError.invalidID(id)
             }
             return uuid
         }
@@ -133,9 +150,10 @@ fileprivate extension Request {
     
     var user: User {
         get async throws {
-            let user = try await User.find(try userID, on: self.db)
+            let userID = try userID
+            let user = try await User.find(userID, on: self.db)
             guard let user else {
-                throw Abort(.notFound, reason: "The requested user does not exist")
+                throw UserError.notFound(userID)
             }
             return user
         }
@@ -143,7 +161,12 @@ fileprivate extension Request {
     
     var currentUser: User {
         get throws {
-            try self.auth.require(User.self)
+            do {
+                return try self.auth.require(User.self)
+            }
+            catch {
+                throw AuthenticationError.notAuthenticated
+            }
         }
     }
 }
