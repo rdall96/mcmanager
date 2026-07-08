@@ -9,3 +9,10 @@ data/
 .env
 api-spec/bruno/environments/*
 
+# Local scratch list of known bugs — not committed; being turned into GitLab
+# work items in a separate workflow instead.
+ISSUES.md
+
+# AI
+.claude/settings.local.json
+
