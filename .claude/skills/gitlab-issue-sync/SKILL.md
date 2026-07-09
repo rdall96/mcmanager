@@ -38,9 +38,17 @@ wrong is not.
 
 ### 1. Get the API token
 
-If not already supplied in the conversation, ask for a GitLab personal/project
-access token with `api` scope. Use it only in-memory for `curl` calls this
-session — never write it to a file, log, or commit.
+Check for a cached token first: if `.gitlab_token` exists at the repo root
+and is non-empty, read it and use its contents as the token. This file is
+git-ignored, so it's safe to keep it there between sessions.
+
+If the file doesn't exist or is empty, ask the user for a GitLab
+personal/project access token with the `read_repository`, `read_api`, and
+`api` scopes, then write it to `.gitlab_token` at the repo root (creating the
+file) so future syncs don't need to ask again. Before writing, confirm
+`.gitlab_token` is actually listed
+in `.gitignore` — if it isn't, stop and tell the user rather than risking the
+token getting committed.
 
 ### 2. Read the source file fresh
 
@@ -146,8 +154,11 @@ Report back the created issue URLs/IIDs grouped by label.
   live label set** (fetched fresh each sync, never hardcoded) — not by a
   fixed section→label table. Section headings are only a hint. Don't
   unilaterally create a new label if nothing fits; ask the user instead.
-- **Never persist the API token** anywhere other than the in-memory shell
-  environment for the duration of the session.
+- **The API token is cached in `.gitlab_token` at the repo root** (a
+  git-ignored file) so the user isn't asked for it on every sync. Read it
+  from there if present; otherwise ask the user and write it there for next
+  time. Never write the token anywhere else (no logs, commits, or other
+  files), and double-check `.gitignore` covers it before writing.
 - **Issues are always read from `ISSUES.md`** at the repo root — a fixed
   filename convention for this skill, not a per-project setting.
 - **Write the GitLab issue reference back into `ISSUES.md` immediately after
