@@ -8,6 +8,7 @@ data/
 .swiftpm
 .env
 api-spec/bruno/environments/*
+.gitlab_token
 
 # Local scratch list of known bugs — not committed; being turned into GitLab
 # work items in a separate workflow instead.
