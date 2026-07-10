@@ -107,7 +107,9 @@ struct RoleController: MCManagerAPIRoute, RouteCollection {
     // MARK: - Default Permissions
     
     func defaultPermissions(req: Request) async throws -> Permissions {
-        try requireAdmin(for: req) // only admins can manage default permissions
+        // must be logged in, but all users can read the default permissions
+        // this is necessary for callers of the API to programmatically gate user behavior when there's no role assigned
+        try requireAuthenticated(for: req)
         return try await Permissions.defaults(on: req.db) ?? .defaults
     }
     
