@@ -90,12 +90,12 @@ final class User: Model, Content, @unchecked Sendable {
         if !request.password.isEmpty {
             password = try User.hashPassword(request.password)
         }
-        
-        // some fields can't be updated for the admins
+
+        // the role can't be changed for admins
         if !isAdmin {
             $role.id = request.$role.id
         }
-        
+
         updatedAt = .now
     }
     

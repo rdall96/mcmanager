@@ -94,6 +94,7 @@ struct UserController: MCManagerAPIRoute, RouteCollection {
     func update(req: Request) async throws -> User {
         let user = try await req.user
         let hasPermissions = try await req.userHasPermissions(for: .editUsers)
+        let userRequest = try req.content.decode(User.self)
         guard try user.isCurrentUser(for: req) || hasPermissions else {
             throw UserError.unauthorized
         }
@@ -102,10 +103,16 @@ struct UserController: MCManagerAPIRoute, RouteCollection {
         if user.isAdmin, !(try user.isCurrentUser(for: req)), !(try req.currentUser.isSuperAdmin) {
             throw UserError.unauthorized
         }
-        
-        let userRequest = try req.content.decode(User.self)
+
+        // a user can't change it's own role (regardless of permissions)
+        if try user.isCurrentUser(for: req), user.$role.id != userRequest.$role.id {
+            throw UserError.unauthorized
+        }
+
+        // update the user info
         try user.update(with: userRequest)
         try await user.save(on: req.db)
+
         return user
     }
 
