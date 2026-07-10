@@ -14,6 +14,7 @@ protocol MCManagerAPIRoute {
 
 extension MCManagerAPIRoute {
 
+    @discardableResult
     func requireAuthenticated(for req: Request) throws -> User {
         do {
             return try req.auth.require(User.self)
