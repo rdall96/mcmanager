@@ -55,6 +55,12 @@ struct ApplicationErrorMiddleware: Middleware {
 
                 request.logger.report(error: applicationError)
             }
+            else if let abortError = error as? AbortError {
+                status = abortError.status
+                errorResponse = ErrorResponse(reason: abortError.reason)
+
+                request.logger.report(error: abortError)
+            }
             else {
                 // Convert all unknown errors to 500.
                 status = .internalServerError
