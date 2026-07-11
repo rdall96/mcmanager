@@ -117,6 +117,15 @@ struct UserController: MCManagerAPIRoute, RouteCollection {
         if !user.isSuperAdmin, userRequest.isSuperAdmin {
             throw UserError.unauthorized
         }
+        // * duplicate username
+        let existingUserWithRequestedName = try await User.query(on: req.db)
+            .filter(\.$username, .equal, userRequest.username)
+            .filter(\.$id, .notEqual, user.requireID())
+            .first()
+        guard existingUserWithRequestedName == nil else {
+            logger.error("Attempted to update user with duplicated username: \(userRequest.username)")
+            throw UserError.alreadyExists
+        }
 
         // Update the user:
         // * username
