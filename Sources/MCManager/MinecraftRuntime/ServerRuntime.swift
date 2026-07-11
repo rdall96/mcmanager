@@ -252,7 +252,13 @@ final actor ServerRuntime: Identifiable {
     /// Configuration for the Docker client with the parameters necessary to run the container
     private var dockerConfig: Docker.ContainerSpec {
         // enviroment variables
-        var environment: [Docker.ContainerSpec.EnvironmentVariable] = properties.environmentVariables
+        var environment: [Docker.ContainerSpec.EnvironmentVariable] = []
+        do {
+            environment = try properties.generateEnvironmentVariables()
+        }
+        catch {
+            logger.error("Failed to generate environment variables, user selections will be ignored. Error: \(error)")
+        }
         environment.append(contentsOf: [
             .init(key: "EULA", value: "true"), // accept the EULA for the server to start
             .init(key: "ENABLE_QUERY", value: "true"), // Enable query to allow MCManager to perform queries on the server stats

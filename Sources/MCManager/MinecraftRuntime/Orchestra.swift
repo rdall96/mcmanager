@@ -165,7 +165,7 @@ final class MCServerManager {
     func updateProperties(_ properties: MCServer.Properties, for serverID: UUID) async throws {
         let server = try requireServer(id: serverID)
         try await server.updateProperties(properties)
-        logger.info("Updated \(properties.count) server properties for \(serverID)")
+        logger.info("Updated server properties for \(serverID)")
     }
     
     // MARK: - Execution
