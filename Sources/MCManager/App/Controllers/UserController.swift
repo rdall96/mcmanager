@@ -92,27 +92,59 @@ struct UserController: MCManagerAPIRoute, RouteCollection {
     
     /// Update info for a user
     func update(req: Request) async throws -> User {
+        // Gather necessary data and decode request
         let user = try await req.user
         let hasPermissions = try await req.userHasPermissions(for: .editUsers)
         let userRequest = try req.content.decode(User.self)
         guard try user.isCurrentUser(for: req) || hasPermissions else {
             throw UserError.unauthorized
         }
-        
-        // only the super admin can edit itself
+
+        // Hard checks:
+        // * only the super admin can edit itself
         if user.isAdmin, !(try user.isCurrentUser(for: req)), !(try req.currentUser.isSuperAdmin) {
             throw UserError.unauthorized
         }
-
-        // a user can't change it's own role (regardless of permissions)
+        // * a user can't change it's own role (regardless of permissions)
         if try user.isCurrentUser(for: req), user.$role.id != userRequest.$role.id {
             throw UserError.unauthorized
         }
+        // * only the super admin can grant/revoke admin access
+        if user.isAdmin != userRequest.isAdmin, !(try req.currentUser.isSuperAdmin) {
+            throw UserError.adminRequired
+        }
+        // * super admin access cannot be granted to any user, only the default bootstrapped super admin can exist
+        if !user.isSuperAdmin, userRequest.isSuperAdmin {
+            throw UserError.unauthorized
+        }
 
-        // update the user info
-        try user.update(with: userRequest)
+        // Update the user:
+        // * username
+        if !userRequest.username.isEmpty {
+            user.username = userRequest.username
+        }
+        // * password
+        if !userRequest.password.isEmpty {
+            try user.updatePassword(userRequest.password)
+        }
+        // * role - admins don't have a role, ignore any attempts to change it
+        if !user.isAdmin {
+            user.$role.id = userRequest.$role.id
+        }
+        // * admin privileges - can never be changed for the super admin account
+        if !user.isSuperAdmin {
+            if userRequest.isAdmin {
+                user.grantAdmin()
+            }
+            else {
+                user.revokeAdmin()
+            }
+        }
+        // * last updated timestamp
+        user.updatedAt = .now
+
+        // Save the user and return the updated model
         try await user.save(on: req.db)
-
         return user
     }
 
