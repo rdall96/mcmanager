@@ -113,6 +113,7 @@ enum RoleError: ApplicationError, LocalizedError {
     case invalidID(String)
     case notFound(Role.IDValue)
     case missingPermissions(Role)
+    case alreadyExists
 
     var reason: String {
         switch self {
@@ -120,12 +121,13 @@ enum RoleError: ApplicationError, LocalizedError {
         case .invalidID(let string): "Invalid role ID: \(string)."
         case .notFound(let id): "No role found with ID: \(id)."
         case .missingPermissions(let role): "Missing permissions (\(role.$_permissions.id)) found for role \(role.id?.uuidString ?? "unknown>")."
+        case .alreadyExists: "A role with that name already exists."
         }
     }
 
     var status: HTTPResponseStatus {
         switch self {
-        case .missingID, .invalidID: .badRequest
+        case .missingID, .invalidID, .alreadyExists: .badRequest
         case .notFound: .notFound
         case .missingPermissions: .internalServerError
         }
@@ -137,6 +139,7 @@ enum RoleError: ApplicationError, LocalizedError {
         case .invalidID: 3002
         case .notFound: 3003
         case .missingPermissions: 3004
+        case .alreadyExists: 3005
         }
     }
 

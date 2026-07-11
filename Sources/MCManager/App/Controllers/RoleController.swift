@@ -44,7 +44,16 @@ struct RoleController: MCManagerAPIRoute, RouteCollection {
     func create(req: Request) async throws -> Role {
         try requireAdmin(for: req) // only admins can create new roles
         let newRole = try req.content.decode(Role.self)
-        
+
+        // Ensure a role with this name doesn't already exists
+        let existingRole = try await Role.query(on: req.db)
+            .filter(\.$name, .equal, newRole.name)
+            .first()
+        guard existingRole == nil else {
+            logger.error("Attempted to create role with duplicated name: \(newRole.name)")
+            throw RoleError.alreadyExists
+        }
+
         // create the permissions
         try await newRole.permissions?.save(on: req.db)
         // save the new role
@@ -64,7 +73,17 @@ struct RoleController: MCManagerAPIRoute, RouteCollection {
         
         let role = try await req.role
         let roleRequest = try req.content.decode(Role.self)
-        
+
+        // Ensure the updated role name doesn't already exists
+        let existingRoleWithRequestedName = try await Role.query(on: req.db)
+            .filter(\.$name, .equal, roleRequest.name)
+            .filter(\.$id, .notEqual, role.requireID())
+            .first()
+        guard existingRoleWithRequestedName == nil else {
+            logger.error("Attempted to update role with duplicated name: \(roleRequest.name)")
+            throw RoleError.alreadyExists
+        }
+
         // update the permissions
         if let permissions = try await Permissions.find(role.$_permissions.id, on: req.db),
            let newPermissions = roleRequest.permissions {
