@@ -50,8 +50,8 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
             server.put("properties", use: updateProperties)
             
             // execution
-            server.get("start", use: start)
-            server.get("stop", use: stop)
+            server.post("start", use: start)
+            server.post("stop", use: stop)
             server.post("command", use: command)
             server.get("logs", use: logs)
             
