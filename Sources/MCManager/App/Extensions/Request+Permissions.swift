@@ -70,9 +70,8 @@ extension Request {
 
             // admins can do whatever they want
             if user.isAdmin { return .all }
-            
-            // grab the user role and check the permissions there
-            // users without an assigned role, get default permissions
+
+            // Load the default permissions for later user
             let defaultPermissions: Permissions
             do {
                 defaultPermissions = try await Permissions.defaults(on: db) ?? .defaults
@@ -80,18 +79,17 @@ extension Request {
             catch {
                 throw UserError.unknown
             }
-            guard let roleID = user.$role.id else {
+
+            // Grab the user's role to extract the permissions
+            guard let roleID = user.$role.id, let role = try await Role.find(roleID, on: db) else {
+                // user has no role, use default permissions
                 return defaultPermissions
             }
-
-            var permissions: Permissions?
-            do {
-                permissions = try await Role.find(roleID, on: db)?.permissions
+            guard let permissions = try await Permissions.find(role.$_permissions.id, on: db) else {
+                // role has no permissions linked with it (error: invalid role, DB corrupted or out of sync)
+                throw RoleError.missingPermissions(role)
             }
-            catch {
-                throw RoleError.notFound(roleID)
-            }
-            return permissions ?? defaultPermissions
+            return permissions
         }
     }
     

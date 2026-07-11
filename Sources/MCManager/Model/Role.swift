@@ -26,7 +26,10 @@ final class Role: Model, Content {
     
     @Field(key: FieldKeys.name.rawValue)
     var name: String
-    
+
+    // There's 2 permissions members on purpose:
+    // * `_permissions` is used as a reference to the permissions entity in the respective DB table
+    // * `permissions` is used as a local storage for the permission values: it get's encoded in responses and allows for easy read/write throughout the app
     @Parent(key: FieldKeys.permissionsID.rawValue)
     private(set) var _permissions: Permissions
     var permissions: Permissions?
