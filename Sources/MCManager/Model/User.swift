@@ -82,21 +82,15 @@ final class User: Model, Content, @unchecked Sendable {
     var isAdmin: Bool {
         isSuperAdmin || adminPrivileges == .admin
     }
-    
-    func update(with request: User) throws {
-        if !request.username.isEmpty {
-            username = request.username
-        }
-        if !request.password.isEmpty {
-            password = try User.hashPassword(request.password)
-        }
 
-        // the role can't be changed for admins
-        if !isAdmin {
-            $role.id = request.$role.id
-        }
+    /// Grant a user admin privileges.
+    func grantAdmin() {
+        adminPrivileges = .admin
+    }
 
-        updatedAt = .now
+    /// Revoke a user's admin privileges.
+    func revokeAdmin() {
+        adminPrivileges = .none
     }
     
     // MARK: - Codable
@@ -156,6 +150,11 @@ extension User {
     /// Hash the password
     fileprivate static func hashPassword(_ password: String) throws -> String {
         try Bcrypt.hash(password)
+    }
+
+    /// Update the user's password.
+    func updatePassword(_ newPassword: String) throws {
+        password = try Self.hashPassword(newPassword)
     }
 }
 
