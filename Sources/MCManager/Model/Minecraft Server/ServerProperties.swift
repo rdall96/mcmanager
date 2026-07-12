@@ -11,7 +11,7 @@ import Vapor
 extension MCServer {
     /// https://minecraft.fandom.com/wiki/Server.properties
     // All of these are optional to allow partial updates via the API
-    // and to avoid breakign compatibility when a new property is added
+    // and to avoid breaking compatibility when a new property is added
     struct Properties: Content {
         var allowFlight: Bool?
         var allowNether: Bool?

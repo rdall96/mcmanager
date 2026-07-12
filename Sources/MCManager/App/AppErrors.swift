@@ -60,6 +60,7 @@ enum UserError: ApplicationError {
     case adminRequired
     case cantDeleteAdmin
     case alreadyExists
+    case missingUsername
 
     var reason: String {
         switch self {
@@ -71,6 +72,7 @@ enum UserError: ApplicationError {
         case .adminRequired: "Only administrators can perform this action."
         case .cantDeleteAdmin: "You cannot delete the admin user."
         case .alreadyExists: "A user with that username already exists."
+        case .missingUsername: "A username is required."
         }
     }
 
@@ -82,6 +84,7 @@ enum UserError: ApplicationError {
         case .unauthorized, .adminRequired: .forbidden
         case .cantDeleteAdmin: .badRequest
         case .alreadyExists: .badRequest
+        case .missingUsername: .badRequest
         }
     }
 
@@ -95,6 +98,7 @@ enum UserError: ApplicationError {
         case .adminRequired: 2005
         case .cantDeleteAdmin: 2006
         case .alreadyExists: 2007
+        case .missingUsername: 2008
         }
     }
 
@@ -165,6 +169,9 @@ extension MCServerError: ApplicationError {
         case .systemError: .internalServerError
         case .invalidAction: .badRequest
         case .invalidPlayerAccount: .badRequest
+        case .missingServerName: .badRequest
+        case .typeCantBeChanged: .badRequest
+        case .invalidVersion: .badRequest
         }
     }
 
@@ -186,6 +193,9 @@ extension MCServerError: ApplicationError {
             case .fileDoesNotExist: 4506
             }
         case .invalidPlayerAccount: 4005
+        case .missingServerName: 4006
+        case .typeCantBeChanged: 4007
+        case .invalidVersion: 4008
         }
     }
 }

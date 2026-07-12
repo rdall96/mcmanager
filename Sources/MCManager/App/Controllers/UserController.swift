@@ -117,6 +117,10 @@ struct UserController: MCManagerAPIRoute, RouteCollection {
         if !user.isSuperAdmin, userRequest.isSuperAdmin {
             throw UserError.unauthorized
         }
+        // * empty username
+        if userRequest.username.isEmpty {
+            throw UserError.missingUsername
+        }
         // * duplicate username
         let existingUserWithRequestedName = try await User.query(on: req.db)
             .filter(\.$username, .equal, userRequest.username)
@@ -129,10 +133,8 @@ struct UserController: MCManagerAPIRoute, RouteCollection {
 
         // Update the user:
         // * username
-        if !userRequest.username.isEmpty {
-            user.username = userRequest.username
-        }
-        // * password
+        user.username = userRequest.username
+        // * password: empty means don't update
         if !userRequest.password.isEmpty {
             try user.updatePassword(userRequest.password)
         }

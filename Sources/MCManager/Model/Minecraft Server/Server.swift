@@ -92,12 +92,12 @@ final class MCServer: Model, Content {
     
     convenience init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        // this method is called when we read the data from an API call, so we assign defaults to allow for partial updates
+        // this method is called when we read the data from an API call, some fields are ignored because they will be handled separately (i.e.: update server logic)
         self.init(
-            name: try container.decodeIfPresent(String.self, forKey: .name) ?? "A Minecraft Server",
-            type: try container.decodeIfPresent(ServerType.self, forKey: .type) ?? .java,
-            version: try container.decodeIfPresent(Version.self, forKey: .version) ?? .none,
-            port: try container.decodeIfPresent(Port.self, forKey: .port) ?? 25565
+            name: try container.decode(String.self, forKey: .name),
+            type: try container.decode(ServerType.self, forKey: .type),
+            version: try container.decode(Version.self, forKey: .version),
+            port: try container.decode(Port.self, forKey: .port)
         )
     }
 }
