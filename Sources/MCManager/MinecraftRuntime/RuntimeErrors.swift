@@ -26,6 +26,7 @@ enum MCServerError: LocalizedError {
     case invalidPort(MCServer.Port)
     case systemError(Error)
     case invalidAction(Reason)
+    case invalidPlayerAccount
 
     @_disfavoredOverload
     static func invalidID(_ uuid: UUID?) -> Self {
@@ -49,6 +50,7 @@ enum MCServerError: LocalizedError {
             case .tooManyRunningServers: "You have reached the maximum number servers that can run simultaneously."
             case .fileDoesNotExist: "The requested server file does not exist."
             }
+        case .invalidPlayerAccount: "The requested Minecraft account does not exist."
         }
     }
     
@@ -68,6 +70,7 @@ enum MCServerError: LocalizedError {
             case .tooManyRunningServers: "Stop one or more servers and try again."
             case .fileDoesNotExist: "Please choose a file that actually exists."
             }
+        case .invalidPlayerAccount: "The requested Minecraft account does not exist."
         }
     }
 }

@@ -120,5 +120,10 @@ extension Permissions {
         static let downloadServerFiles =    Servers(rawValue: 1 << 9)
         static let uploadServerFiles =      Servers(rawValue: 1 << 10)
         static let deleteServerFiles =      Servers(rawValue: 1 << 11)
+
+        // players
+        static let manageOperators =        Servers(rawValue: 1 << 12)
+        static let manageWhitelist =        Servers(rawValue: 1 << 13)
+        static let manageBannedPlayers =    Servers(rawValue: 1 << 14)
     }
 }

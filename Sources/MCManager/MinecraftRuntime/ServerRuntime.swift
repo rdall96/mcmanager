@@ -22,7 +22,7 @@ final actor ServerRuntime: Identifiable {
     /// Type of Minecraft server
     nonisolated let type: MCServer.ServerType
     /// Version of Minecraft
-    private(set) var version: String
+    private(set) var version: MCServer.Version
     /// Port this server is hosted on
     private(set) var port: MCServer.Port
     /// Minecraft server properties
@@ -46,7 +46,7 @@ final actor ServerRuntime: Identifiable {
         try FileManager.default.createDirectory(at: path, withIntermediateDirectories: true)
         
         type = info.type
-        version = info.version.description
+        version = info.version
         port = info.port
         
         // Read the properties
@@ -64,7 +64,7 @@ final actor ServerRuntime: Identifiable {
                 // this will automatically pull the image as well
                 self.process = try await Docker.create(
                     .init(name: Defaults.processName(for: id)),
-                    from: Defaults.dockerImage(for: version),
+                    from: Defaults.dockerImage(for: version.description),
                     pull: true // pull the image so we have the latest one ready
                 )
                 // Signal to update the container the next time it's run, since we didn't do a good creating all the properties above
@@ -84,7 +84,7 @@ final actor ServerRuntime: Identifiable {
     
     /// A textual representation fo this server runtime
     var description: String {
-        "(\(self.id)) \(type.rawValue) \(version)"
+        "(\(self.id)) \(type.rawValue) \(version.description)"
     }
     
     // MARK: - Methods
@@ -93,7 +93,7 @@ final actor ServerRuntime: Identifiable {
         guard let id = info.id, self.id == id else {
             throw MCServerError.invalidID(info.id)
         }
-        version = info.version.description
+        version = info.version
         port = info.port
         // Signal that we need to update the process the next time it starts
         processNeedsUpdate = true
@@ -197,7 +197,202 @@ final actor ServerRuntime: Identifiable {
         }
         return fileURL
     }
-    
+
+    // MARK: Player management
+
+    // The player management lists changed format over the years.
+    // Minecraft used to use a TXT format for versiosn 1.7.5 and earlier, then it switched to a JSON format.
+    // Starting with version 1.7.6, any username in <list_name>.txt is automatically converted
+    // to the new format in <list_name>.json when the server starts.
+    // - Reading: We could read the expected file based on the version, but that doesn't account for imported servers.
+    //            A server can be imported, upgraded, and not started -> no list migration has occurred yet.
+    //            So the safest bet is to do a hybrid:
+    //              * 1.7.5 and ealier -> read `white-list.txt`
+    //              * 1.7.6 and later -> read `whitelist.json`. If empty, read `white-list.txt.
+    // Writing: Easier, just write to both for piece of mind.
+
+    /// Fetch the server operators.
+    var operators: MCServer.Operators {
+        get throws {
+            let configurationsDirectory = path.appendingPathComponent(Defaults.serverConfigurationsDirectoryName)
+            let jsonOplistURL = configurationsDirectory.appendingPathComponent(Defaults.opslistJSONFileName)
+            let jsonOplist: [MCServer.Operator] = try MCServer.readPlayerConfigurationJSON(at: jsonOplistURL)
+            if version >= .v1_7_6, !jsonOplist.isEmpty {
+                return Set(jsonOplist)
+            }
+            else {
+                let legacyOplistURL = configurationsDirectory.appendingPathComponent(Defaults.legacyOpslistTXTFileName)
+                let players = try MCServer.readLegacyPlayerConfigurationTXT(at: legacyOplistURL)
+                // convert to the new format using reasonable defaults
+                return Set(players.map {
+                    MCServer.Operator(name: $0, level: 0)
+                })
+            }
+        }
+    }
+
+    private func updateOperators(_ ops: [MCServer.Operator]) throws {
+        let configurationsDirectory = path.appendingPathComponent(Defaults.serverConfigurationsDirectoryName)
+        try FileManager.default.createDirectory(at: configurationsDirectory, withIntermediateDirectories: true)
+        try MCServer.updatePlayerConfigurationJSON(
+            at: configurationsDirectory.appendingPathComponent(Defaults.opslistJSONFileName),
+            with: ops
+        )
+        try MCServer.updateLegacyPlayerConfigurationTXT(
+            at: configurationsDirectory.appendingPathComponent(Defaults.legacyOpslistTXTFileName),
+            with: ops
+        )
+    }
+
+    /// Add a new server operator.
+    func addOperator(_ op: MCServer.Operator) async throws {
+        var ops = Array(try operators)
+        ops.removeAll { $0 == op }
+        ops.append(op)
+        try updateOperators(ops)
+        // If the server is running, reload it so the changes are applied
+        if await isRunning {
+            // FIXME: This doesn't seem to reload the ops list, is there a different command?
+            // Workaround: restart the server
+            try await sendCommand("reload")
+        }
+    }
+
+    /// Remove a server operator (de-op).
+    func removeOperator(_ player: MCPlayerInfo) async throws {
+        let op = MCServer.Operator(player)
+        var ops = Array(try operators)
+        ops.removeAll { $0 == op }
+        try updateOperators(ops)
+        // If the server is running, reload it so the changes are applied
+        if await isRunning {
+            try await sendCommand("reload")
+            // also run the de-op command to be sure the change is applied immediately
+            try await sendCommand("deop \(player.name)")
+        }
+    }
+
+    /// Fetch the server whitelist.
+    var whitelist: MCServer.Whitelist {
+        get throws {
+            let configurationsDirectory = path.appendingPathComponent(Defaults.serverConfigurationsDirectoryName)
+            let whitelistURL = configurationsDirectory.appendingPathComponent(Defaults.whitelistJSONFileName)
+            let whitelist: MCServer.Whitelist = Set(try MCServer.readPlayerConfigurationJSON(at: whitelistURL))
+            if version >= .v1_7_6, !whitelist.isEmpty {
+                return whitelist
+            }
+            else {
+                let legacyWhitelistURL = configurationsDirectory.appendingPathComponent(Defaults.legacyWhitelistTXTFileName)
+                let players = try MCServer.readLegacyPlayerConfigurationTXT(at: legacyWhitelistURL)
+                // convert to the new format using reasonable defaults
+                return Set(players.map {
+                    MCServer.WhitelistedPlayer(name: $0)
+                })
+            }
+        }
+    }
+
+    private func updateWhitelist(_ whitelistedPlayers: [MCServer.WhitelistedPlayer]) throws {
+        let configurationsDirectory = path.appendingPathComponent(Defaults.serverConfigurationsDirectoryName)
+        try FileManager.default.createDirectory(at: configurationsDirectory, withIntermediateDirectories: true)
+        try MCServer.updatePlayerConfigurationJSON(
+            at: configurationsDirectory.appendingPathComponent(Defaults.whitelistJSONFileName),
+            with: whitelistedPlayers
+        )
+        try MCServer.updateLegacyPlayerConfigurationTXT(
+            at: configurationsDirectory.appendingPathComponent(Defaults.legacyWhitelistTXTFileName),
+            with: whitelistedPlayers
+        )
+    }
+
+    /// Add a player to the server whitelist.
+    func whitelistPlayer(_ player: MCPlayerInfo) async throws {
+        let whitelistedPlayer = MCServer.WhitelistedPlayer(player)
+        var whitelist = Array(try whitelist)
+        whitelist.removeAll { $0 == whitelistedPlayer }
+        whitelist.append(whitelistedPlayer)
+        try updateWhitelist(whitelist)
+        // If the server is running, reload it so the changes are applied
+        if await isRunning {
+            try await sendCommand("whitelist reload")
+        }
+    }
+
+    /// Remove a player from the whitelist.
+    func removeWhitelistedPlayer(_ player: MCPlayerInfo) async throws {
+        let whitelistedPlayer = MCServer.WhitelistedPlayer(player)
+        var whitelist = Array(try whitelist)
+        whitelist.removeAll { $0 == whitelistedPlayer }
+        try updateWhitelist(whitelist)
+        // If the server is running, reload it so the changes are applied
+        if await isRunning {
+            try await sendCommand("whitelist reload")
+        }
+    }
+
+    var bannedPlayers: MCServer.BannedPlayers {
+        get throws {
+            let configurationsDirectory = path.appendingPathComponent(Defaults.serverConfigurationsDirectoryName)
+            let jsonBanlistURL = configurationsDirectory.appendingPathComponent(Defaults.banlistJSONFileName)
+            let jsonBanlist: MCServer.BannedPlayers = Set(try MCServer.readPlayerConfigurationJSON(at: jsonBanlistURL))
+            if version >= .v1_7_6, !jsonBanlist.isEmpty {
+                return jsonBanlist
+            }
+            else {
+                let legacyBanlistURL = configurationsDirectory.appendingPathComponent(Defaults.legacyBanlistTXTFileName)
+                let players = try MCServer.readLegacyPlayerConfigurationTXT(at: legacyBanlistURL)
+                // convert to the new format using reasonable defaults
+                return Set(players.map {
+                    MCServer.BannedPlayer(name: $0)
+                })
+            }
+        }
+    }
+
+    private func updateBannedPlayers(_ bannedPlayers: [MCServer.BannedPlayer]) throws {
+        let configurationsDirectory = path.appendingPathComponent(Defaults.serverConfigurationsDirectoryName)
+        try FileManager.default.createDirectory(at: configurationsDirectory, withIntermediateDirectories: true)
+        try MCServer.updatePlayerConfigurationJSON(
+            at: configurationsDirectory.appendingPathComponent(Defaults.banlistJSONFileName),
+            with: bannedPlayers
+        )
+        try MCServer.updateLegacyPlayerConfigurationTXT(
+            at: configurationsDirectory.appendingPathComponent(Defaults.legacyBanlistTXTFileName),
+            with: bannedPlayers
+        )
+    }
+
+    /// Add a new server operator.
+    func banPlayer(_ player: MCPlayerInfo, reason: String?) async throws {
+        let bannedPlayer = MCServer.BannedPlayer(player, reason: reason)
+        var bannedPlayers = Array(try bannedPlayers)
+        bannedPlayers.removeAll { $0 == bannedPlayer }
+        bannedPlayers.append(bannedPlayer)
+        try updateBannedPlayers(bannedPlayers)
+        // If the server is running, reload it so the changes are applied
+        if await isRunning {
+            // FIXME: this doesn't seem to reload the banlist, is there perhaps a different command?
+            // Workaround: restart the server
+            try await sendCommand("reload")
+        }
+    }
+
+    /// Pardon a player (remove from the list of banned players).
+    func pardonPlayer(_ player: MCPlayerInfo) async throws {
+        let bannedPlayer = MCServer.BannedPlayer(player)
+        var bannedPlayers = Array(try bannedPlayers)
+        bannedPlayers.removeAll { $0 == bannedPlayer }
+        try updateBannedPlayers(bannedPlayers)
+        // If the server is running, reload it so the changes are applied
+        if await isRunning {
+            // FIXME: this doesn't seem to reload the banlist, is there perhaps a different command?
+            // Workaround: restart the server
+            try await sendCommand("reload")
+            // also run the pardon command to be sure the change is applied immediately
+            try await sendCommand("pardon \(player.name)")
+        }
+    }
+
     // MARK: - Docker runtime
     
     var dockerProcessStatus: Docker.Container.Status {
@@ -291,7 +486,7 @@ final actor ServerRuntime: Identifiable {
             labels: [
                 "mcmanager.server.id": id.uuidString,
                 "mcmanager.server.type": type.rawValue,
-                "mcmanager.server.version": version,
+                "mcmanager.server.version": version.description,
             ],
             name: name,
             ports: ports,
@@ -323,7 +518,7 @@ final actor ServerRuntime: Identifiable {
                 try await Docker.remove(container: process)
                 self.process = try await Docker.create(
                     dockerConfig,
-                    from: Defaults.dockerImage(for: version),
+                    from: Defaults.dockerImage(for: version.description),
                     pull: true
                 )
             }
@@ -482,7 +677,28 @@ extension ServerRuntime {
         
         /// Name of the server properties file on disk
         static let serverPropertiesFileName = "server-properties.mcmanager"
-        
+
+        /// Name of the server configurations directory
+        static let serverConfigurationsDirectoryName = "configurations"
+
+        /// Name of the legacy ops file (pre Minecraft 1.7.6)
+        static let legacyOpslistTXTFileName = "ops.txt"
+
+        /// Name of the ops file (Minecraft 1.7.6+)
+        static let opslistJSONFileName = "ops.json"
+
+        /// Name of the legacy whitelist file (pre Minecraft 1.7.6)
+        static let legacyWhitelistTXTFileName = "white-list.txt"
+
+        /// Name of the whitelist file (Minecraft 1.7.6+)
+        static let whitelistJSONFileName = "whitelist.json"
+
+        /// Name of the legacy banned players file (pre Minecraft 1.7.6)
+        static let legacyBanlistTXTFileName = "banned-players.txt"
+
+        /// Name of the banned players file (Minecraft 1.7.6+)
+        static let banlistJSONFileName = "banned-players.json"
+
         /// Names of server files that are private to MCManager
         static let privateFileNames: [String] = [
             serverPropertiesFileName,
@@ -491,7 +707,7 @@ extension ServerRuntime {
         /// Docker volume paths to map on the local host
         static let dockerVolumePaths: [String] = [
             "/minecraft/world",
-            "/minecraft/configurations",
+            "/minecraft/\(serverConfigurationsDirectoryName)",
             "/minecraft/mods"
         ]
         
@@ -507,6 +723,13 @@ extension ServerRuntime {
         /// Name of the Minecraft server image repository in DockerHub
         static let dockerHubRepositoryName: DockerHub.Repository.Name = "minecraft-server"
     }
+}
+
+// MARK: - Known server versions
+fileprivate extension MCServer.Version {
+    /// Version 1.7.6.
+    /// Minecraft switched from `white-list.txt` to `whitelist.json` in this version.
+    static let v1_7_6 = Self(major: 1, minor: 7, patch: 6)
 }
 
 // MARK: - Equatable

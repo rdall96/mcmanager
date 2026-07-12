@@ -46,9 +46,10 @@ extension MCServer {
 
 extension MCServer.Version: Equatable, Comparable {
     static func < (lhs: MCServer.Version, rhs: MCServer.Version) -> Bool {
-        // in most cases the major version will be the same (who knows if Mojang will ever create Minecraft 2.0)
+        // Minecraft 1.21.x was the last game version to follow the long standing 1.x.x format.
+        // In 2026 the game switched to using the year as the major version (i.e.: 26.1, 26.2, etc...)
         guard lhs.major == rhs.major else {
-            return lhs.major > rhs.major
+            return lhs.major < rhs.major
         }
         // compare minor versions
         guard lhs.minor == rhs.minor else {
