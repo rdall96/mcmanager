@@ -401,7 +401,7 @@ final actor ServerRuntime: Identifiable {
                 return try await Docker.status(of: process)
             }
             catch {
-                logger.critical("Failed to fetch container status: \(error)")
+                logger.critical("Failed to fetch container status for server \(id): \(error)")
                 return .unknown
             }
         }
@@ -411,8 +411,17 @@ final actor ServerRuntime: Identifiable {
     func updateStatus() async {
         let dockerStatus = await dockerProcessStatus
         if case .running = dockerStatus {
-            let logs = (try? await logs().reversed()) ?? []
-            status = MCServer.Status.latestStatus(in: logs.joined(separator: "\n"))
+            // only check the status through the last 100 logs, otherwise this operation can get expensive...
+            let logs = (try? await logs(tail: 100)) ?? []
+            let latestStatus = MCServer.Status.latestStatus(in: logs)
+            if case .unknown = latestStatus {
+                // the logs couldn't find the exact status of the server,
+                // but since the docker process is running it's safe to assume so is the server.
+                status = .running
+            }
+            else {
+                status = latestStatus
+            }
         }
         else {
             status = MCServer.Status(with: dockerStatus)
@@ -452,7 +461,7 @@ final actor ServerRuntime: Identifiable {
             environment = try properties.generateEnvironmentVariables()
         }
         catch {
-            logger.error("Failed to generate environment variables, user selections will be ignored. Error: \(error)")
+            logger.error("Failed to generate environment variables for server \(id), user selections will be ignored. Error: \(error)")
         }
         environment.append(contentsOf: [
             .init(key: "EULA", value: "true"), // accept the EULA for the server to start
@@ -496,15 +505,41 @@ final actor ServerRuntime: Identifiable {
     }
     
     /// Monitor the server start/stop cycle to accurately report the `status`
-    private func waitForStatus(_ desiredStatus: MCServer.Status) async {
-        while self.status != desiredStatus {
-            let logs = (try? await logs(tail: 100)) ?? []
-            let currentStatus = MCServer.Status.latestStatus(in: logs.joined(separator: "\n"))
-            if currentStatus != .unknown {
-                self.status = currentStatus
+    @discardableResult
+    private func waitForStatus(_ desiredStatus: MCServer.Status, timeout: TimeInterval? = nil) async -> Bool {
+        let startTime = Date.now
+        repeat {
+            // if we've hit the timeout, exit early
+            let timeElapsed = Date.now.timeIntervalSince(startTime)
+            if let timeout, timeElapsed > timeout {
+                return false
             }
-            try? await Task.sleep(seconds: 1)
-        }
+
+            // check the container status first
+            let dockerStatus = await dockerProcessStatus
+
+            if case .exited = dockerStatus {
+                // the container stopped, there's only one possible status to report
+                self.status = .stopped
+            }
+            else {
+                // continuosly search for the latest status of a container by looking at the last few logs
+                // the more logs we search through the more expensive the search gets, so limit it to the last 50 logs.
+                let logs = (try? await logs(tail: 50)) ?? []
+                let currentStatus = MCServer.Status.latestStatus(in: logs)
+                // ignore unknown statuses: the latestStatus search might not have found what it needed
+                if currentStatus != .unknown {
+                    self.status = currentStatus
+                }
+            }
+
+            if self.status != desiredStatus {
+                // pause before performing the next search to allow more logs to flow through
+                try? await Task.sleep(seconds: 1)
+            }
+        } while self.status != desiredStatus
+
+        return true
     }
     
     /// Start the server
@@ -524,42 +559,56 @@ final actor ServerRuntime: Identifiable {
             }
             catch {
                 status = .error
-                logger.critical("Failed to re-create container: \(error)")
+                logger.critical("Failed to re-create container for sever \(id): \(error)")
                 throw MCServerError.systemError(error)
             }
         }
         
-        // update status manually to notify the server is starting
-        status = .starting
         do {
             try await Docker.start(process)
+            status = .starting
+            // observe the starting process in a background task
+            Task(priority: .background) {
+                // give the container a few seconds to spin up first
+                try? await Task.sleep(seconds: 5)
+
+                let success = await waitForStatus(.running, timeout: Defaults.startupTimeout)
+                if success {
+                    logger.notice("Server \(id) started")
+                }
+                else {
+                    logger.warning("Server \(id) starting observer timed out")
+                }
+                processNeedsUpdate = false
+            }
         }
         catch {
+            logger.critical("Failed to start server \(id): \(error)")
             status = .error
-            logger.critical("Failed to start server: \(error)")
             throw MCServerError.systemError(error)
-        }
-        Task(priority: .background) {
-            await waitForStatus(.running)
-            processNeedsUpdate = false
         }
     }
     
     /// Stop the server
     func stop() async throws {
         try await ensureIsRunning()
-        // update status manually to notify the server is stopping
-        status = .stopping
         do {
             try await sendCommand("stop")
+            status = .stopping
+            // observe the container status while it's stopping
+            Task(priority: .background) {
+                let success = await waitForStatus(.stopped, timeout: Defaults.shutdownTimeout)
+                if success {
+                    logger.notice("Server \(id) stopped")
+                }
+                else {
+                    logger.warning("Server \(id) stopping observer timed out")
+                }
+            }
         }
         catch {
-            status = .error
-            logger.critical("Failed to send stop command to the server: \(error)")
+            logger.critical("Failed to send stop command to server \(id): \(error)")
             throw MCServerError.systemError(error)
-        }
-        Task(priority: .background) {
-            await waitForStatus(.stopped)
         }
     }
     
@@ -582,14 +631,14 @@ final actor ServerRuntime: Identifiable {
             .split(separator: " ")
             .first
         guard let pid else {
-            logger.critical("No process ID found for running server to send command")
+            logger.critical("No process ID found for running server \(id) to send command")
             throw MCServerError.unknown
         }
         do {
             try await Docker.exec("/bin/bash -c \"echo \(command.sanitized) > /proc/\(pid)/fd/0\"", in: process)
         }
         catch {
-            logger.error("Failed to send server command: \(error)")
+            logger.error("Failed to send command to server \(id): \(error)")
             throw MCServerError.systemError(error)
         }
     }
@@ -599,7 +648,7 @@ final actor ServerRuntime: Identifiable {
             return try await Docker.logs(for: process, tail: tail)
         }
         catch {
-            logger.error("Failed to get server logs: \(error)")
+            logger.error("Failed to get logs for server \(id): \(error)")
             throw MCServerError.systemError(error)
         }
     }
@@ -674,7 +723,12 @@ extension ServerRuntime {
                 tag: .init(version)
             )
         }
-        
+
+        /// 5 minutes
+        fileprivate static let startupTimeout: TimeInterval = 300
+        /// 2 minutes
+        fileprivate static let shutdownTimeout: TimeInterval = 120
+
         /// Name of the server properties file on disk
         static let serverPropertiesFileName = "server-properties.mcmanager"
 
@@ -762,55 +816,53 @@ extension ServerRuntime.Command {
 
 // MARK: - Status Regex
 extension MCServer.Status {
-    fileprivate static func latestStatus(in logs: String) -> Self {
+    fileprivate static func latestStatus(in logs: [String]) -> Self {
         // the order is always the same: starting, running, stopping
-        // so checking it backwards and short-circuiting when a regex matches, will give us the latest status
-        
-        if (try? ServerStatusRegex.stoppingRegex.firstMatch(in: logs)) != nil {
-            return .stopping
+        // reverse the order of the logs so that first match = most recent status
+        let history = logs.reversed().joined(separator: "\n")
+
+        // run a match for each potential status, then compare the start indices to figure out which one came first
+        let startingMatch = try? ServerStatusRegex.startingRegex.firstMatch(in: history)?.startIndex
+        let runningMatch = try? ServerStatusRegex.runningRegex.firstMatch(in: history)?.startIndex
+        let stoppingMatch = try? ServerStatusRegex.stoppingRegex.firstMatch(in: history)?.startIndex
+
+        // the most recent status is the match with the lowest start index in the log history
+        let mostRecentMatch = [startingMatch, runningMatch, stoppingMatch]
+            .compactMap { $0 } // drop `nil` matches
+            .min()
+
+        return switch mostRecentMatch {
+        case startingMatch: .starting
+        case runningMatch: .running
+        case stoppingMatch: .stopping
+        default: .unknown
         }
-        
-        if (try? ServerStatusRegex.runningRegex.firstMatch(in: logs)) != nil {
-            return .running
-        }
-        
-        if (try? ServerStatusRegex.startingRegex.firstMatch(in: logs)) != nil {
-            return .starting
-        }
-        
-        return .unknown
     }
 }
 
 fileprivate enum ServerStatusRegex {
     // thank you https://swiftregex.com for these awesome builder patterns
     
-    // INFO\]:* Starting
+    // Starting server...
     static let startingRegex: Regex<Substring> = {
         Regex {
-            "INFO]"
-            ZeroOrMore {
-                ":"
-            }
-            " Starting"
+            "Starting server..."
         }
         .anchorsMatchLineEndings()
     }()
     
     // INFO\]:* Done \((\d+.\d+)s\)!
-    static let runningRegex: Regex<(Substring, Substring)> = {
+    static let runningRegex: Regex<Substring> = {
         Regex {
             "INFO]"
             ZeroOrMore {
                 ":"
             }
             " Done ("
-            Capture {
-                Regex {
-                    OneOrMore(.digit)
-                    One(".")
-                    OneOrMore(.digit)
-                }
+            Regex {
+                OneOrMore(.digit)
+                One(".")
+                OneOrMore(.digit)
             }
             "s)!"
         }
