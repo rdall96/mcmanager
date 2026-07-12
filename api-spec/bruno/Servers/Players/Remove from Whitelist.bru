@@ -1,0 +1,23 @@
+meta {
+  name: Remove from Whitelist
+  type: http
+  seq: 6
+}
+
+delete {
+  url: {{base_url}}/api/v1/servers/{{server_id}}/players/whitelist
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "rdall96"
+  }
+}
+
+script:pre-request {
+  if (bru.getEnvVar("server_id") == "") {
+    throw "Missing server ID";
+  }
+}

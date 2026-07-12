@@ -63,6 +63,21 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
                 files.on(.POST, body: .stream, use: uploadFile)
                 files.delete(use: removeFile)
             }
+
+            // players
+            server.group("players") { players in
+                players.get("operators", use: operators)
+                players.post("operators", use: addOperator)
+                players.delete("operators", use: removeOperator)
+
+                players.get("whitelist", use: whitelist)
+                players.post("whitelist", use: addToWhitelist)
+                players.delete("whitelist", use: removeFromWhitelist)
+
+                players.get("banned", use: bannedPlayers)
+                players.post("banned", use: banPlayer)
+                players.delete("banned", use: unbanPlayer)
+            }
         }
     }
     
@@ -398,11 +413,177 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         let downloadSession = try FileDownloadSession(for: req, url: fileURL)
         return downloadSession.get()
     }
+
+    // MARK: Player management
+
+    func operators(req: Request) async throws -> [MCServer.Operator] {
+        // users must have the manageOperators permission
+        guard try await req.userHasPermissions(for: .manageOperators) else {
+            throw UserError.unauthorized
+        }
+        let serverID = try req.serverID
+        return Array(try await manager.operators(for: serverID))
+    }
+
+    func addOperator(req: Request) async throws -> HTTPStatus {
+        // users must have the manageOperators permission
+        guard try await req.userHasPermissions(for: .manageOperators) else {
+            throw UserError.unauthorized
+        }
+        let serverID = try req.serverID
+
+        // two supported request formats
+        let opAddRequest = try req.content.decode(MCServer.Operator?.self)
+        let playerAddRequest = try req.content.decode(MCPlayerInfo?.self)
+
+        // the requested player must exist
+        let playerID = opAddRequest?.id ?? playerAddRequest?.id
+        let playerName = opAddRequest?.name ?? playerAddRequest?.name
+        guard let playerName else {
+            throw MCServerError.invalidPlayerAccount
+        }
+        let playerInfo = try await ensurePlayerExists(playerName, id: playerID, for: req)
+
+        // If the level is `nil` we need to fetch the default server operator level from the server properties
+        var opLevel: MCServer.Operator.Level
+        if let level = opAddRequest?.level {
+            opLevel = level
+        }
+        else if let defaultOpLevel = try await manager.properties(for: serverID).opPermissionLevel {
+            opLevel = defaultOpLevel
+        }
+        else {
+            // the op level was not specified by the request, and we can't find the server default value
+            // set this to a non-permissive value that won't accidentally give the player too much power
+            // a user can change this by making a new request and specify the op level
+            opLevel = 0
+        }
+
+        // Create the add request
+        let op = MCServer.Operator(
+            id: playerInfo.id,
+            name: playerInfo.name,
+            level: opLevel,
+            ignoresPlayerLimit: opAddRequest?.ignoresPlayerLimit
+        )
+        try await manager.addOperator(op, on: serverID)
+
+        return .ok
+    }
+
+    func removeOperator(req: Request) async throws -> HTTPStatus {
+        guard try await req.userHasPermissions(for: .manageOperators) else {
+            throw UserError.unauthorized
+        }
+        let serverID = try req.serverID
+        let removeRequest = try req.content.decode(MCPlayerInfo.self)
+
+        // the requested player must exist
+        let playerInfo = try await ensurePlayerExists(removeRequest.name, id: removeRequest.id, for: req)
+
+        // remove from the list
+        try await manager.removeOperator(playerInfo, on: serverID)
+
+        return .ok
+    }
+
+    func whitelist(req: Request) async throws -> [MCPlayerInfo] {
+        // all logged in users can see the whitelist, no permissions required
+        let serverID = try req.serverID
+        return try await manager.whitelist(for: serverID).map {
+            MCPlayerInfo(id: $0.id, name: $0.name)
+        }
+    }
+
+    func addToWhitelist(req: Request) async throws -> HTTPStatus {
+        // users must have the manageWhitelist permission
+        guard  try await req.userHasPermissions(for: .manageWhitelist) else {
+            throw UserError.unauthorized
+        }
+        let serverID = try req.serverID
+        let addRequest = try req.content.decode(MCPlayerInfo.self)
+
+        // the requested player must exist
+        let playerInfo = try await ensurePlayerExists(addRequest.name, id: addRequest.id, for: req)
+
+        // add to whitelist
+        try await manager.whitelistPlayer(playerInfo, on: serverID)
+
+        return .ok
+    }
+
+    func removeFromWhitelist(req: Request) async throws -> HTTPStatus {
+        // users must have the manageWhitelist permission
+        guard  try await req.userHasPermissions(for: .manageWhitelist) else {
+            throw UserError.unauthorized
+        }
+        let serverID = try req.serverID
+        let removeRequest = try req.content.decode(MCPlayerInfo.self)
+
+        // the requested player must exist
+        let playerInfo = try await ensurePlayerExists(removeRequest.name, id: removeRequest.id, for: req)
+
+        // remove from the list
+        try await manager.removeWhitelistedPlayer(playerInfo, on: serverID)
+
+        return .ok
+    }
+
+    func bannedPlayers(req: Request) async throws -> [MCServer.BannedPlayer] {
+        // users must have the manageBannedPlayers permission
+        guard try await req.userHasPermissions(for: .manageBannedPlayers) else {
+            throw UserError.unauthorized
+        }
+        let serverID = try req.serverID
+        return Array(try await manager.bannedPlayers(for: serverID))
+    }
+
+    func banPlayer(req: Request) async throws -> HTTPStatus {
+        // users must have the manageBannedPlayers permission
+        guard try await req.userHasPermissions(for: .manageBannedPlayers) else {
+            throw UserError.unauthorized
+        }
+        let serverID = try req.serverID
+
+        // two supported request formats
+        let banRequest = try req.content.decode(MCServer.BannedPlayer?.self)
+        let playerBanRequest = try req.content.decode(MCPlayerInfo?.self)
+
+        // the requested player must exist
+        let playerID = banRequest?.id ?? playerBanRequest?.id
+        let playerName = banRequest?.name ?? playerBanRequest?.name
+        guard let playerName else {
+            throw MCServerError.invalidPlayerAccount
+        }
+        let playerInfo = try await ensurePlayerExists(playerName, id: playerID, for: req)
+
+        // add to the ban list
+        try await manager.banPlayer(playerInfo, reason: banRequest?.reason, on: serverID)
+
+        return .ok
+    }
+
+    func unbanPlayer(req: Request) async throws -> HTTPStatus {
+        // users must have the manageBannedPlayers permission
+        guard  try await req.userHasPermissions(for: .manageBannedPlayers) else {
+            throw UserError.unauthorized
+        }
+        let serverID = try req.serverID
+        let removeRequest = try req.content.decode(MCPlayerInfo.self)
+
+        // the requested player must exist
+        let playerInfo = try await ensurePlayerExists(removeRequest.name, id: removeRequest.id, for: req)
+
+        // remove from the list
+        try await manager.pardonPlayer(playerInfo, on: serverID)
+
+        return .ok
+    }
 }
 
 // MARK: - Helpers
-extension ServerController {
-    
+fileprivate extension ServerController {
+
     // Fetch the most up-to-date service settings
     func settings(on database: Database) async throws -> Settings {
         try await Settings.query(on: database).first() ?? .defaults
@@ -436,6 +617,24 @@ extension ServerController {
         catch {
             logger.error("Failed to delete server status cache for \(serverID): \(error)")
         }
+    }
+
+    /// Ensure a requested Minecraft account exists on Mojang's servers and return that players info.
+    func ensurePlayerExists(_ playerName: String, id: MCPlayerInfo.ID, for req: Request) async throws -> MCPlayerInfo {
+        let playerInfo: MCPlayerInfo
+        do {
+            playerInfo = try await req.client.minecraftPlayerInfo(for: playerName)
+        }
+        catch {
+            throw MCServerError.invalidPlayerAccount
+        }
+        guard let playerID = playerInfo.id else {
+            throw MCServerError.invalidPlayerAccount
+        }
+        if let requestID = id, playerID != requestID {
+            throw MCServerError.invalidPlayerAccount
+        }
+        return playerInfo
     }
 }
 

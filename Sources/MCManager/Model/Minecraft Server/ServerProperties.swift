@@ -32,7 +32,7 @@ extension MCServer {
         var maxWorldSize: UInt?
         var motd: String?
         var onlineMode: Bool?
-        var opPermissionLevel: Int?
+        var opPermissionLevel: UInt?
         var playerIdleTimeout: Int?
         var pvp: Bool?
         var rconPassword: String?

@@ -164,6 +164,7 @@ extension MCServerError: ApplicationError {
         case .invalidPort: .badRequest
         case .systemError: .internalServerError
         case .invalidAction: .badRequest
+        case .invalidPlayerAccount: .badRequest
         }
     }
 
@@ -184,6 +185,7 @@ extension MCServerError: ApplicationError {
             case .tooManyRunningServers: 4505
             case .fileDoesNotExist: 4506
             }
+        case .invalidPlayerAccount: 4005
         }
     }
 }

@@ -34,7 +34,8 @@ extension Permissions {
                 .createServers, .editServers, .deleteServers,
                 .readServerProperties, .editServerProperties,
                 .startStopServers, .readServerLogs,
-                .downloadServerFiles, .uploadServerFiles, .deleteServerFiles
+                .downloadServerFiles, .uploadServerFiles, .deleteServerFiles,
+                .manageWhitelist
             ]
         )
     }

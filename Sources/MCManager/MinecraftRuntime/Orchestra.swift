@@ -252,4 +252,42 @@ final class MCServerManager {
         try requireServer(id: serverID)
             .file(at: relativePath)
     }
+
+    // MARK: - Player management
+
+    func operators(for serverID: MCServer.IDValue) async throws -> MCServer.Operators {
+        try await requireServer(id: serverID).operators
+    }
+
+    func addOperator(_ op: MCServer.Operator, on serverID: MCServer.IDValue) async throws {
+        try await requireServer(id: serverID).addOperator(op)
+    }
+
+    func removeOperator(_ player: MCPlayerInfo, on serverID: MCServer.IDValue) async throws {
+        try await requireServer(id: serverID).removeOperator(player)
+    }
+
+    func whitelist(for serverID: MCServer.IDValue) async throws -> MCServer.Whitelist {
+        try await requireServer(id: serverID).whitelist
+    }
+
+    func whitelistPlayer(_ player: MCPlayerInfo, on serverID: MCServer.IDValue) async throws {
+        try await requireServer(id: serverID).whitelistPlayer(player)
+    }
+
+    func removeWhitelistedPlayer(_ player: MCPlayerInfo, on serverID: MCServer.IDValue) async throws {
+        try await requireServer(id: serverID).removeWhitelistedPlayer(player)
+    }
+
+    func bannedPlayers(for serverID: MCServer.IDValue) async throws -> MCServer.BannedPlayers {
+        try await requireServer(id: serverID).bannedPlayers
+    }
+
+    func banPlayer(_ player: MCPlayerInfo, reason: String? = nil, on serverID: MCServer.IDValue) async throws {
+        try await requireServer(id: serverID).banPlayer(player, reason: reason)
+    }
+
+    func pardonPlayer(_ player: MCPlayerInfo, on serverID: MCServer.IDValue) async throws {
+        try await requireServer(id: serverID).pardonPlayer(player)
+    }
 }
