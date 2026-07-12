@@ -505,8 +505,16 @@ final actor ServerRuntime: Identifiable {
     }
     
     /// Monitor the server start/stop cycle to accurately report the `status`
-    private func waitForStatus(_ desiredStatus: MCServer.Status) async {
+    @discardableResult
+    private func waitForStatus(_ desiredStatus: MCServer.Status, timeout: TimeInterval? = nil) async -> Bool {
+        let startTime = Date.now
         repeat {
+            // if we've hit the timeout, exit early
+            let timeElapsed = Date.now.timeIntervalSince(startTime)
+            if let timeout, timeElapsed > timeout {
+                return false
+            }
+
             // check the container status first
             let dockerStatus = await dockerProcessStatus
 
@@ -530,6 +538,8 @@ final actor ServerRuntime: Identifiable {
                 try? await Task.sleep(seconds: 1)
             }
         } while self.status != desiredStatus
+
+        return true
     }
     
     /// Start the server
@@ -562,8 +572,13 @@ final actor ServerRuntime: Identifiable {
                 // give the container a few seconds to spin up first
                 try? await Task.sleep(seconds: 5)
 
-                await waitForStatus(.running)
-                logger.notice("Server \(id) started")
+                let success = await waitForStatus(.running, timeout: Defaults.startupTimeout)
+                if success {
+                    logger.notice("Server \(id) started")
+                }
+                else {
+                    logger.warning("Server \(id) starting observer timed out")
+                }
                 processNeedsUpdate = false
             }
         }
@@ -582,8 +597,13 @@ final actor ServerRuntime: Identifiable {
             status = .stopping
             // observe the container status while it's stopping
             Task(priority: .background) {
-                await waitForStatus(.stopped)
-                logger.notice("Server \(id) stopped")
+                let success = await waitForStatus(.stopped, timeout: Defaults.shutdownTimeout)
+                if success {
+                    logger.notice("Server \(id) stopped")
+                }
+                else {
+                    logger.warning("Server \(id) stopping observer timed out")
+                }
             }
         }
         catch {
@@ -703,7 +723,12 @@ extension ServerRuntime {
                 tag: .init(version)
             )
         }
-        
+
+        /// 5 minutes
+        fileprivate static let startupTimeout: TimeInterval = 300
+        /// 2 minutes
+        fileprivate static let shutdownTimeout: TimeInterval = 120
+
         /// Name of the server properties file on disk
         static let serverPropertiesFileName = "server-properties.mcmanager"
 
