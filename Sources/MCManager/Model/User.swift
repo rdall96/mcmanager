@@ -57,7 +57,7 @@ final class User: Model, Content, @unchecked Sendable {
     init(
         username: String,
         password: String,
-        isAdmin: Bool? = nil,
+        isAdmin: Bool = false,
         roleID: UUID? = nil
     ) throws {
         self.id = UUID()
@@ -65,10 +65,10 @@ final class User: Model, Content, @unchecked Sendable {
         self.password = try User.hashPassword(password)
         self.createdAt = .now
         self.updatedAt = .now
-        self.adminPrivileges = (isAdmin ?? false) ? .admin : .none
+        self.adminPrivileges = isAdmin ? .admin : .none
         
         // some fields don't matter for admins
-        if let isAdmin, !isAdmin {
+        if !isAdmin {
             self.$role.id = roleID
         }
     }
@@ -115,11 +115,13 @@ final class User: Model, Content, @unchecked Sendable {
         createdAt = .now
         updatedAt = .now
         
-        username = try container.decodeIfPresent(String.self, forKey: .username) ?? ""
+        username = try container.decode(String.self, forKey: .username)
+
+        // password is optional to allow for user updates without needing to re-include the password
         password = try container.decodeIfPresent(String.self, forKey: .password) ?? ""
-        
-        let isAdmin = try container.decodeIfPresent(Bool.self, forKey: .isAdmin)
-        adminPrivileges = (isAdmin ?? false) ? .admin : .none
+
+        let isAdmin = try container.decode(Bool.self, forKey: .isAdmin)
+        adminPrivileges = isAdmin ? .admin : .none
         
         $role.id = try container.decodeIfPresent(UUID.self, forKey: .role)
     }

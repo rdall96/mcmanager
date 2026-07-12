@@ -106,18 +106,33 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         guard try await req.userHasPermissions(for: .createServers) else {
             throw UserError.unauthorized
         }
-        let server = try req.content.decode(MCServer.self)
-        try await ensureIsValid(server: server, on: req.db)
-        try await server.save(on: req.db)
+        let newServer = try req.content.decode(MCServer.self)
+        let settings = try await settings(on: req.db)
+
+        // Hard checks:
+        // * non-empty server name
+        if newServer.name.isEmpty {
+            throw MCServerError.missingServerName
+        }
+        // * the version needs to be valid
+        if newServer.version == .none {
+            throw MCServerError.invalidVersion
+        }
+        // * the port must be in the allowed range
+        if !settings.allowedServerPortsData.contains(newServer.port) {
+            throw MCServerError.invalidPort(newServer.port)
+        }
+
+        try await newServer.save(on: req.db)
         do {
-            try await manager.add(server: server)
+            try await manager.add(server: newServer)
         }
         catch {
-            logger.critical("Failed to create server: \(error)")
-            try await server.delete(on: req.db)
+            logger.critical("Failed to create server runtime: \(error)")
+            try await newServer.delete(on: req.db)
             throw error
         }
-        return server
+        return newServer
     }
     
     func server(req: Request) async throws -> MCServer {
@@ -128,21 +143,34 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         guard try await req.userHasPermissions(for: .editServers) else {
             throw UserError.unauthorized
         }
-        let serverRequest = try req.content.decode(MCServer.self)
         let server = try await req.server
-        
-        if !serverRequest.name.isEmpty {
-            server.name = serverRequest.name
+        let updateRequest = try req.content.decode(MCServer.self)
+        let settings = try await settings(on: req.db)
+
+        // Hard checks:
+        // * non-empty server name
+        if updateRequest.name.isEmpty {
+            throw MCServerError.missingServerName
         }
-        if serverRequest.version != .none {
-            server.version = serverRequest.version
+        // * server type can be changed after creation
+        if updateRequest.type != server.type {
+            throw MCServerError.typeCantBeChanged
         }
-        if serverRequest.port > 0, serverRequest.port != server.port {
-            server.port = serverRequest.port
+        // * the version needs to be valid
+        if updateRequest.version == .none {
+            throw MCServerError.invalidVersion
         }
+        // * the port must be in the allowed range
+        if !settings.allowedServerPortsData.contains(updateRequest.port) {
+            throw MCServerError.invalidPort(updateRequest.port)
+        }
+
+        // Update the server:
+        server.name = updateRequest.name
+        server.version = updateRequest.version
+        server.port = updateRequest.port
         server.updatedAt = .now
-        
-        try await ensureIsValid(server: server, on: req.db)
+
         try await server.save(on: req.db)
         do {
             try await manager.update(server: server)
@@ -633,16 +661,6 @@ fileprivate extension ServerController {
         for server in servers {
             try await manager.add(server: server)
         }
-    }
-    
-    /// Ensure the server is valid
-    func ensureIsValid(server: MCServer, on database: Database) async throws {
-        let settings = try await settings(on: database)
-        // check the server port
-        if !settings.allowedServerPortsData.contains(server.port) {
-            throw MCServerError.invalidPort(server.port)
-        }
-        // TODO: check the server version against the supported runtimes?
     }
 
     /// Wipe the status cache for the given server.

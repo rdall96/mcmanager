@@ -27,6 +27,9 @@ enum MCServerError: LocalizedError {
     case systemError(Error)
     case invalidAction(Reason)
     case invalidPlayerAccount
+    case missingServerName
+    case typeCantBeChanged
+    case invalidVersion
 
     @_disfavoredOverload
     static func invalidID(_ uuid: UUID?) -> Self {
@@ -51,6 +54,9 @@ enum MCServerError: LocalizedError {
             case .fileDoesNotExist: "The requested server file does not exist."
             }
         case .invalidPlayerAccount: "The requested Minecraft account does not exist."
+        case .missingServerName: "A server name is required."
+        case .typeCantBeChanged: "The server type cannot be changed."
+        case .invalidVersion: "Invalid server version."
         }
     }
     
@@ -71,6 +77,9 @@ enum MCServerError: LocalizedError {
             case .fileDoesNotExist: "Please choose a file that actually exists."
             }
         case .invalidPlayerAccount: "The requested Minecraft account does not exist."
+        case .missingServerName: nil
+        case .typeCantBeChanged: nil
+        case .invalidVersion: nil
         }
     }
 }
