@@ -213,38 +213,68 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
     }
     
     // MARK: - Status
-    
-    private func serverStatus(for serverID: UUID, on database: Database) async throws -> ServerStatusCache? {
-        let settings = try await self.settings(on: database)
-        guard settings.serverStatusCacheIsEnabled else {
-            return nil
+
+    /// Small actor to synchronize refreshes of a server status.
+    /// There are 2 endpoints in the server API that can trigger a refresh (/info and /stats) and both can be called concurrently.
+    /// Whenever that happens and the cache is invalid, we end up doing duplicate work.
+    /// This small objects helps reduce that overhead by blocking any duplicate requests and returning the result of the first one.
+    private actor ServerStatusCacheManager{
+        static let shared = ServerStatusCacheManager()
+
+        typealias RefreshTask = Task<ServerStatusCache, Error>
+        private var activeRefreshes: [MCServer.IDValue : RefreshTask] = [:]
+
+        func serverStatus(
+            for serverID: MCServer.IDValue,
+            on database: Database,
+            with settings: Settings,
+            manager: MCServerManager
+        ) async throws -> ServerStatusCache? {
+            guard settings.serverStatusCacheIsEnabled else { return nil }
+
+            // check if there's already a refresh occurring
+            if let activeRefresh = activeRefreshes[serverID] {
+                return try await activeRefresh.value
+            }
+
+            // create a new refresh task
+            let task = RefreshTask {
+                defer { activeRefreshes[serverID] = nil }
+
+                // check if we have a valid cache in the DB
+                let cachedStatus = try await ServerStatusCache.find(serverID, on: database)
+                if let cachedStatus, !settings.serverStatusCacheIsExpired(cachedStatus) {
+                    return cachedStatus
+                }
+                else {
+                    // cache is either stale or invalid, delete it
+                    try await cachedStatus?.delete(on: database)
+                }
+
+                // fetch a new status and save it
+                let status = ServerStatusCache(
+                    id: serverID,
+                    info: try await manager.info(for: serverID),
+                    stats: try await manager.stats(for: serverID)
+                )
+                try await status.save(on: database)
+                return status
+            }
+            activeRefreshes[serverID] = task
+
+            return try await task.value
         }
-        let cachedStatus = try await ServerStatusCache.find(serverID, on: database)
-        if let cachedStatus, !settings.serverStatusCacheIsExpired(cachedStatus) {
-            return cachedStatus
-        }
-        // delete any previous cached status
-        try await cachedStatus?.delete(on: database)
-        // create a new cache
-        let status: ServerStatusCache
-        do {
-            status = ServerStatusCache(
-                id: serverID,
-                info: try await manager.info(for: serverID),
-                stats: try await manager.stats(for: serverID)
-            )
-        }
-        catch {
-            logger.error("Failed to fetch server info or stats: \(error)")
-            throw error
-        }
-        try await status.save(on: database)
-        return status
     }
     
     func info(req: Request) async throws -> MCServer.Info {
         let serverID = try req.serverID
-        guard let info = try await serverStatus(for: serverID, on: req.db)?.info else {
+        let status = try await ServerStatusCacheManager.shared.serverStatus(
+            for: serverID,
+            on: req.db,
+            with: try await self.settings(on: req.db),
+            manager: manager
+        )
+        guard let info = status?.info else {
             return try await manager.info(for: serverID)
         }
         return info
@@ -252,7 +282,13 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
     
     func stats(req: Request) async throws -> MCServer.Stats {
         let serverID = try req.serverID
-        guard let metrics = try await serverStatus(for: serverID, on: req.db)?.stats else {
+        let status = try await ServerStatusCacheManager.shared.serverStatus(
+            for: serverID,
+            on: req.db,
+            with: try await self.settings(on: req.db),
+            manager: manager
+        )
+        guard let metrics = status?.stats else {
             return try await manager.stats(for: serverID)
         }
         return metrics
