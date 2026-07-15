@@ -8,7 +8,10 @@
 import Foundation
 import Fluent
 import Vapor
+import VaporToOpenAPI
 
+@OpenAPIDescriptable
+/// Permissions to control user access to the API.
 final class Permissions: Model, Content {
     static let schema = "permissions"
     
@@ -19,7 +22,7 @@ final class Permissions: Model, Content {
         case servers
     }
     
-    // MARK: - Members
+    // MARK: Members
     
     @ID(key: .id)
     var id: UUID?
@@ -28,19 +31,26 @@ final class Permissions: Model, Content {
     internal var isDefaults: Bool
     
     @Field(key: FieldKeys.application.rawValue)
+    /// Bitmask of application related permissions.
     var application: Application
     
     @Field(key: FieldKeys.users.rawValue)
+    /// Bitmask of user related permissions.
     var users: Users
     
     @Field(key: FieldKeys.servers.rawValue)
+    /// Bitmask of server related permissions.
     var servers: Servers
     
-    // MARK: - Initializers
+    // MARK: Initializers
     
     init() {}
     
-    init(application: Application, users: Users, servers: Servers) {
+    init(
+        application: Application = .init(rawValue: 0),
+        users: Users = .init(rawValue: 0),
+        servers: Servers = .init(rawValue: 0)
+    ) {
         self.id = UUID()
         self.isDefaults = false
         self.application = application
@@ -48,17 +58,9 @@ final class Permissions: Model, Content {
         self.servers = servers
     }
     
-    // MARK: - Methods
+    // MARK: Codable
     
-    func update(with newPermissions: Permissions) {
-        application = newPermissions.application
-        users = newPermissions.users
-        servers = newPermissions.servers
-    }
-    
-    // MARK: - Codable
-    
-    private enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey {
         case application = "app"
         case users
         case servers
@@ -67,9 +69,9 @@ final class Permissions: Model, Content {
     convenience init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.init(
-            application: Application(rawValue: try container.decode(UInt64.self, forKey: .application)),
-            users: Users(rawValue: try container.decode(UInt64.self, forKey: .users)),
-            servers: Servers(rawValue: try container.decode(UInt64.self, forKey: .servers))
+            application: Application(rawValue: try container.decode(Application.RawValue.self, forKey: .application)),
+            users: Users(rawValue: try container.decode(Users.RawValue.self, forKey: .users)),
+            servers: Servers(rawValue: try container.decode(Servers.RawValue.self, forKey: .servers))
         )
     }
     
@@ -81,15 +83,17 @@ final class Permissions: Model, Content {
     }
 }
 
-// MARK: - Permissions
+// MARK: - Permission sets
 extension Permissions {
-    
+
+    /// Permissions that apply to general application settings.
     struct Application: OptionSet, Codable {
         let rawValue: UInt64
 
         static let editSettings =   Application(rawValue: 1 << 0)
     }
-    
+
+    /// Permissions tthat apply to user operations.
     struct Users: OptionSet, Codable {
         let rawValue: UInt64
         
@@ -98,7 +102,8 @@ extension Permissions {
         static let editUsers =              Users(rawValue: 1 << 2)
         static let deleteUsers =            Users(rawValue: 1 << 3)
     }
-    
+
+    /// Permissions that apply to server operations.
     struct Servers: OptionSet, Codable {
         let rawValue: UInt64
         

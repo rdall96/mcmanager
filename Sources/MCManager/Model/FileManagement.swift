@@ -7,12 +7,18 @@
 
 import Foundation
 import Vapor
+import VaporToOpenAPI
 import Crypto
 import NIOCore
 import Zip
 
+@OpenAPIDescriptable
+/// Information about a directory and its contents.
 struct FileBrowser: Content {
+
+    /// Path of the current directory.
     let path: String
+    /// Contents of the directory.
     let files: [String]
     
     init(relativePath: String?, files: [String]) {
@@ -27,9 +33,23 @@ enum FileType: String, Codable {
     case directory
 }
 
+@OpenAPIDescriptable
+/// Required parameters for server files related requests.
+/// i.e.: browse/download/delete.
+struct FileRequest: Content {
+    /// The path to the requested file, relative to the server root directory.
+    let path: String?
+}
+
+@OpenAPIDescriptable
+/// Request to upload a file.
 struct FileUploadRequest: Codable {
+
+    /// Path where to save the file.
     let filePath: String
+    /// Type fo file being upload.
     let fileType: FileType
+    /// File checksum.
     let checksum: String
     
     var fileName: String {

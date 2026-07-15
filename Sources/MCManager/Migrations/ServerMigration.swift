@@ -7,7 +7,7 @@
 
 import Fluent
 
-extension MCServer {
+extension MinecraftServer {
     
     static var migrations: [AsyncMigration] {
         [CreateTable()]
@@ -15,7 +15,7 @@ extension MCServer {
     
     struct CreateTable: AsyncMigration {
         func prepare(on database: any Database) async throws {
-            try await database.schema(MCServer.schema)
+            try await database.schema(MinecraftServer.schema)
                 .id()
                 .field(FieldKeys.name.rawValue, .string, .required)
                 .unique(on: FieldKeys.name.rawValue, name: "no_duplicate_\(FieldKeys.name.rawValue)")
@@ -29,7 +29,7 @@ extension MCServer {
         }
         
         func revert(on database: any Database) async throws {
-            try await database.schema(MCServer.schema).delete()
+            try await database.schema(MinecraftServer.schema).delete()
         }
     }
 }

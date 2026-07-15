@@ -5,8 +5,8 @@
 //  Created by Ricky Dall'Armellina on 10/8/24.
 //
 
-import Vapor
 import Fluent
+import Vapor
 
 protocol MCManagerAPIRoute {
     var logger: Logger { get }
@@ -63,9 +63,10 @@ struct API: MCManagerAPIRoute, RouteCollection {
         )
     }
     
-    func boot(routes: RoutesBuilder) throws {
+    func boot(routes: any RoutesBuilder) throws {
         let api = routes.grouped("api")
-        
+            .openAPIMetadata()
+
         try api.register(collection: settingsController)
         try api.register(collection: userController)
         try api.register(collection: roleController)

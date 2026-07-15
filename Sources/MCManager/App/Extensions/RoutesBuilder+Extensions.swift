@@ -23,7 +23,13 @@ extension RoutesBuilder {
             .grouped(SessionToken.Authenticator())
             .grouped(User.guardMiddleware(throwing: AuthenticationError.notAuthenticated))
     }
-    
+
+    /// This route requires the user to have the given permisisons.
+    func requiresPermissions(_ permissions: Permissions) -> any RoutesBuilder {
+        // TODO: Add permissions middleware
+        return self
+    }
+
     /// Group routes by the API version
     func apiVersion(_ version: APIVersion) -> any RoutesBuilder {
         return self.grouped("\(version.rawValue)")

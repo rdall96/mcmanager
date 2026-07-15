@@ -7,12 +7,17 @@
 
 import Foundation
 import Vapor
+import VaporToOpenAPI
 
-extension MCServer {
+extension MinecraftServer {
+    @OpenAPIDescriptable
+    /// Minecraft server system usage.
     struct Stats: Content {
-        /// CPU usage for the server process
+
+        /// CPU usage for the server process.
         let cpuPercent: Double
-        /// Memory usage (bytes) for the server process
+
+        /// Memory usage (bytes) for the server process.
         let memoryUsageBytes: UInt
         
         init(cpuPercent: Double, memoryUsage: UInt) {
@@ -20,9 +25,9 @@ extension MCServer {
             self.memoryUsageBytes = memoryUsage
         }
         
-        // MARK: - Codable
+        // MARK: Codable
         
-        private enum CodingKeys: String, CodingKey {
+        enum CodingKeys: String, CodingKey {
             case cpuPercent
             case memoryUsageBytes
         }

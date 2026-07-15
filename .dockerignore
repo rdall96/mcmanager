@@ -2,17 +2,28 @@
 .dockerignore
 Dockerfile
 
-# System files
+# System & project files
 .DS_Store
 .build
+xcuserdata
+*.xcodeproj
+DerivedData/
+data/
 .swiftpm
+.env
+api-spec
+.gitlab_token
 .vscode
+ISSUES.md
 
 # Git
 .git
 .gitignore
 .gitlab-ci.yml
-*.md
-api-spec
+README.md
 
+# CI-only tooling, not needed in the image
+scripts/
 
+# Other
+.claude/

@@ -7,11 +7,17 @@
 
 import Foundation
 import Vapor
+import VaporToOpenAPI
 
+@OpenAPIDescriptable
+/// Minecraft account.
 /// Information regarding a Minecraft player.
 /// See: GET - https://api.mojang.com/users/profiles/minecraft/<player_name>
-struct MCPlayerInfo: Identifiable, Hashable, Content {
+struct MinecraftPlayerInfo: Identifiable, Hashable, Content {
+
+    /// Account UUID.
     let id: UUID?
+    /// User name.
     let name: String
 
     init(id: UUID? = nil, name: String) {
@@ -36,7 +42,16 @@ struct MCPlayerInfo: Identifiable, Hashable, Content {
         }
         self.name = try container.decode(String.self, forKey: .name)
     }
+
+    // MARK: Codable
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+    }
 }
+
+// MARK: - Helpers
 
 fileprivate extension UUID {
     init?(string: String) {

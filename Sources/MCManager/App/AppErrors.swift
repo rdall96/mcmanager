@@ -19,7 +19,6 @@ protocol ApplicationError: AbortError, LocalizedError {
 }
 
 extension ApplicationError {
-    var description: String { "[\(code)]: \(reason)" }
     var errorDescription: String? { description }
     var failureReason: String? { reason }
 }
@@ -30,6 +29,13 @@ enum AuthenticationError: ApplicationError {
     case notAuthenticated
     case invalidCredentials
 
+    var description: String {
+        switch self {
+        case .notAuthenticated: "Not authenticated."
+        case .invalidCredentials: "Invalid credentials."
+        }
+    }
+
     var reason: String {
         switch self {
         case .notAuthenticated: "You are not logged in."
@@ -39,7 +45,8 @@ enum AuthenticationError: ApplicationError {
 
     var status: HTTPResponseStatus {
         switch self {
-        case .notAuthenticated, .invalidCredentials: .unauthorized
+        case .notAuthenticated: .unauthorized
+        case .invalidCredentials: .badRequest
         }
     }
 
@@ -53,52 +60,70 @@ enum AuthenticationError: ApplicationError {
 
 enum UserError: ApplicationError {
     case unknown
-    case missingID
-    case invalidID(String)
-    case notFound(User.IDValue)
+    case notFound
     case unauthorized
-    case adminRequired
-    case cantDeleteAdmin
     case alreadyExists
+    case missingID
+    case invalidID
     case missingUsername
+    case missingPassword
+    case adminRequired
+    case invalidRole
+    case cantDeleteAdmin
+
+    var description: String {
+        switch self {
+        case .unknown: "Unknown user error."
+        case .notFound: "User not found."
+        case .unauthorized: "Unauthorized."
+        case .alreadyExists: "User already exists."
+        case .missingID: "Missing user ID."
+        case .invalidID: "Invalid user ID."
+        case .missingUsername: "Missing username."
+        case .missingPassword: "Missing password."
+        case .adminRequired: "Admin required."
+        case .invalidRole: "Invalid user role."
+        case .cantDeleteAdmin: "Cannot delete admin user."
+        }
+    }
 
     var reason: String {
         switch self {
         case .unknown: "An unknown error occurred."
-        case .missingID: "A user ID is missing."
-        case .invalidID(let string): "Invalid user ID: \(string)."
-        case .notFound(let id): "No user found with ID: \(id)."
         case .unauthorized: "You do not have the necessary permissions to perform this action."
+        case .alreadyExists: "A user with that username already exists."
+        case .missingPassword: "A user password is required."
         case .adminRequired: "Only administrators can perform this action."
         case .cantDeleteAdmin: "You cannot delete the admin user."
-        case .alreadyExists: "A user with that username already exists."
-        case .missingUsername: "A username is required."
+        default: description
         }
     }
 
     var status: HTTPStatus {
         switch self {
         case .unknown: .internalServerError
-        case .missingID, .invalidID: .badRequest
         case .notFound: .notFound
-        case .unauthorized, .adminRequired: .forbidden
-        case .cantDeleteAdmin: .badRequest
-        case .alreadyExists: .badRequest
-        case .missingUsername: .badRequest
+        case .unauthorized: .unauthorized
+        case .alreadyExists: .conflict
+        case .missingID, .invalidID: .badRequest
+        case .missingUsername, .missingPassword, .invalidRole: .badRequest
+        case .adminRequired, .cantDeleteAdmin: .forbidden
         }
     }
 
     var code: ErrorCode {
         switch self {
         case .unknown: 2000
-        case .missingID: 2001
-        case .invalidID: 2002
-        case .notFound: 2003
-        case .unauthorized: 2004
-        case .adminRequired: 2005
-        case .cantDeleteAdmin: 2006
-        case .alreadyExists: 2007
-        case .missingUsername: 2008
+        case .notFound: 2001
+        case .unauthorized: 2002
+        case .alreadyExists: 2003
+        case .missingID: 2004
+        case .invalidID: 2005
+        case .missingUsername: 2006
+        case .missingPassword: 2007
+        case .adminRequired: 2008
+        case .invalidRole: 2009
+        case .cantDeleteAdmin: 2010
         }
     }
 
@@ -113,37 +138,51 @@ enum UserError: ApplicationError {
 }
 
 enum RoleError: ApplicationError, LocalizedError {
+    case notFound
     case missingID
     case invalidID(String)
-    case notFound(Role.IDValue)
-    case missingPermissions(Role)
+    case missingName
+    case missingPermissions
     case alreadyExists
+    case cantDelete
+
+    var description: String {
+        switch self {
+        case .notFound: "Role not found."
+        case .missingID: "Missing role ID."
+        case .invalidID(_): "Invalid role ID."
+        case .missingName: "Missing role name."
+        case .missingPermissions: "Role permissions not found."
+        case .alreadyExists: "Role already exists."
+        case .cantDelete: "Role can't be deleted."
+        }
+    }
 
     var reason: String {
         switch self {
-        case .missingID: "A role ID is missing."
         case .invalidID(let string): "Invalid role ID: \(string)."
-        case .notFound(let id): "No role found with ID: \(id)."
-        case .missingPermissions(let role): "Missing permissions (\(role.$_permissions.id)) found for role \(role.id?.uuidString ?? "unknown>")."
         case .alreadyExists: "A role with that name already exists."
+        default: description
         }
     }
 
     var status: HTTPResponseStatus {
         switch self {
-        case .missingID, .invalidID, .alreadyExists: .badRequest
         case .notFound: .notFound
+        case .missingID, .invalidID, .missingName, .alreadyExists, .cantDelete: .badRequest
         case .missingPermissions: .internalServerError
         }
     }
 
     var code: ErrorCode {
         switch self {
-        case .missingID: 3001
-        case .invalidID: 3002
-        case .notFound: 3003
-        case .missingPermissions: 3004
-        case .alreadyExists: 3005
+        case .notFound: 3001
+        case .missingID: 3002
+        case .invalidID: 3003
+        case .missingName: 3004
+        case .missingPermissions: 3005
+        case .alreadyExists: 3006
+        case .cantDelete: 3007
         }
     }
 
@@ -151,51 +190,59 @@ enum RoleError: ApplicationError, LocalizedError {
         switch self {
         case .missingID: "Please provide a role ID and try again."
         case .invalidID: "Check that the role ID is valid and try again."
+        case .cantDelete: "Remove all members before deleting a rol."
         default: nil
         }
     }
 }
 
-extension MCServerError: ApplicationError {
+extension MinecraftServerError: ApplicationError {
 
-    var reason: String { errorDescription ?? localizedDescription }
+    var description: String { errorDescription }
+
+    var reason: String { errorDescription }
 
     var status: HTTPResponseStatus {
         switch self {
         case .unknown: .internalServerError
-        case .invalidID: .badRequest
         case .notFound: .notFound
-        case .invalidPort: .badRequest
-        case .systemError: .internalServerError
-        case .invalidAction: .badRequest
-        case .invalidPlayerAccount: .badRequest
+        case .invalidID: .badRequest
+        case .alreadyExists: .conflict
         case .missingServerName: .badRequest
+        case .missingServerType: .badRequest
         case .typeCantBeChanged: .badRequest
         case .invalidVersion: .badRequest
+        case .invalidPort: .badRequest
+        case .stopped: .badRequest
+        case .running: .badRequest
+        case .portAlreadyInUse: .locked
+        case .tooManyRunningServers: .notAcceptable
+        case .invalidCommand: .badRequest
+        case .fileDoesNotExist: .notFound
+        case .invalidPlayerAccount: .notFound
+        case .systemError(_): .internalServerError
         }
     }
 
     var code: ErrorCode {
         switch self {
         case .unknown: 4000
-        case .invalidID: 4001
-        case .notFound: 4002
-        case .invalidPort: 4003
-        case .systemError: 4004
-        case .invalidAction(let reason): // 4500...
-            switch reason {
-            case .serverIsStopped: 4500
-            case .serverIsRunning: 4501
-            case .serverAlreadyExists: 4502
-            case .portAlreadyInUse: 4503
-            case .invalidCommand: 4504
-            case .tooManyRunningServers: 4505
-            case .fileDoesNotExist: 4506
-            }
-        case .invalidPlayerAccount: 4005
-        case .missingServerName: 4006
-        case .typeCantBeChanged: 4007
-        case .invalidVersion: 4008
+        case .notFound: 4001
+        case .invalidID: 4002
+        case .alreadyExists: 4003
+        case .missingServerName: 4004
+        case .missingServerType: 4005
+        case .typeCantBeChanged: 4006
+        case .invalidVersion: 4007
+        case .invalidPort: 4008
+        case .stopped: 4009
+        case .running: 4010
+        case .portAlreadyInUse: 4011
+        case .tooManyRunningServers: 4012
+        case .invalidCommand: 4013
+        case .fileDoesNotExist: 4014
+        case .invalidPlayerAccount: 4015
+        case .systemError(_): 4016
         }
     }
 }

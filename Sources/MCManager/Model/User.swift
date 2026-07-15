@@ -7,7 +7,9 @@
 
 import Fluent
 import Vapor
+import VaporToOpenAPI
 
+/// User information.
 final class User: Model, Content, @unchecked Sendable {
     static let schema = "users"
     
@@ -26,31 +28,38 @@ final class User: Model, Content, @unchecked Sendable {
         case superAdmin
     }
     
-    // MARK: - Members
-    
+    // MARK: Members
+
     @ID(key: .id)
+    /// User ID.
     var id: UUID?
     
     @Field(key: FieldKeys.username.rawValue)
+    /// User name.
     var username: String
     
-    // this is the password has for the data model, but it's also used as a plain text password when creating new users
     @Field(key: FieldKeys.password.rawValue)
+    /// User password. Only present when creating a new user.
+    /// - NOTE: This is the password hash for the data model, but it's also used as a plain text password when creating new users.
     var password: String
     
     @Field(key: FieldKeys.createdAt.rawValue)
+    /// Date when the user was created.
     var createdAt: Date
     
     @Field(key: FieldKeys.updatedAt.rawValue)
+    /// Date when the user was last updated.
     var updatedAt: Date
     
     @Field(key: FieldKeys.adminPrivileges.rawValue)
     private var adminPrivileges: AdminPrivileges
     
     @OptionalParent(key: FieldKeys.roleID.rawValue)
+    /// Role this user is assigned to.
+    /// Determines the user's permissions.
     var role: Role?
     
-    // MARK: - Initializers
+    // MARK: Initializers
     
     init() {}
     
@@ -60,6 +69,10 @@ final class User: Model, Content, @unchecked Sendable {
         isAdmin: Bool = false,
         roleID: UUID? = nil
     ) throws {
+        if username.isEmpty {
+            throw UserError.missingUsername
+        }
+
         self.id = UUID()
         self.username = username
         self.password = try User.hashPassword(password)
@@ -73,7 +86,7 @@ final class User: Model, Content, @unchecked Sendable {
         }
     }
     
-    // MARK: - Methods
+    // MARK: Methods
     
     var isSuperAdmin: Bool {
         adminPrivileges == .superAdmin
@@ -93,9 +106,9 @@ final class User: Model, Content, @unchecked Sendable {
         adminPrivileges = .none
     }
     
-    // MARK: - Codable
+    // MARK: Codable
     
-    private enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey {
         case id
         case username
         case password
@@ -105,28 +118,9 @@ final class User: Model, Content, @unchecked Sendable {
         case role
     }
     
-    // override decoding to set defaults so we can allow partial updates
-    convenience init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.init()
-        
-        // we don't decode the id and the dates since those get updated internally
-        id = nil
-        createdAt = .now
-        updatedAt = .now
-        
-        username = try container.decode(String.self, forKey: .username)
-
-        // password is optional to allow for user updates without needing to re-include the password
-        password = try container.decodeIfPresent(String.self, forKey: .password) ?? ""
-
-        let isAdmin = try container.decode(Bool.self, forKey: .isAdmin)
-        adminPrivileges = isAdmin ? .admin : .none
-        
-        $role.id = try container.decodeIfPresent(UUID.self, forKey: .role)
-    }
-    
-    // override encoding since we want to omit the password field
+    // override encoding:
+    // * omit the password
+    // * translate the admin privileges into a simple flag
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(try requireID(), forKey: .id)
@@ -138,6 +132,7 @@ final class User: Model, Content, @unchecked Sendable {
     }
 }
 
+// MARK: - Authentication
 extension User: ModelCredentialsAuthenticatable {
     static let usernameKey: KeyPath<User, Field<String>> = \User.$username
     static let passwordHashKey: KeyPath<User, Field<String>> = \User.$password
@@ -147,11 +142,14 @@ extension User: ModelCredentialsAuthenticatable {
     }
 }
 
-// MARK: Password hashing
+// MARK: - Password hashing
 extension User {
     /// Hash the password
     fileprivate static func hashPassword(_ password: String) throws -> String {
-        try Bcrypt.hash(password)
+        if password.isEmpty {
+            throw UserError.missingPassword
+        }
+        return try Bcrypt.hash(password)
     }
 
     /// Update the user's password.
@@ -172,5 +170,19 @@ extension User {
         )
         user.adminPrivileges = .superAdmin
         return user
+    }
+}
+
+// MARK: - Open API Spec
+extension User: OpenAPIDescriptable {
+    static var openAPIDescription: OpenAPIDescriptionType? {
+        OpenAPIDescription<CodingKeys>("User information.")
+            .add(for: .id, "User ID.")
+            .add(for: .username, "User name.")
+            .add(for: .password, "User password. Only present when creating a new user.")
+            .add(for: .createdAt, "Date when the user was created in ISO 8601 format.")
+            .add(for: .updatedAt, "Date when the user was last updated in ISO 8601 format.")
+            .add(for: .isAdmin, "Flag indicating if the user is an admin.")
+            .add(for: .role, "Role ID of the user.")
     }
 }

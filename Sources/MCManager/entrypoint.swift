@@ -4,7 +4,7 @@ import Logging
 
 /// This extension is temporary and can be removed once Vapor gets this support.
 private extension Vapor.Application {
-    static let baseExecutionQueue = DispatchQueue(label: "mcmanager.codes.entrypoint")
+    static let baseExecutionQueue = DispatchQueue(label: "mcmanager.entrypoint")
     
     func runFromAsyncMainEntrypoint() async throws {
         try await withCheckedThrowingContinuation { continuation in

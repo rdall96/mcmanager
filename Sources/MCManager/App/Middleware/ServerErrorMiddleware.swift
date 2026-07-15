@@ -7,40 +7,47 @@
 
 import Foundation
 import Vapor
+import VaporToOpenAPI
 
-// MARK: - Error Middleware
+@OpenAPIDescriptable
+/// MCManager error response.
+struct ErrorResponse: Codable {
+    /// Always set to true to indicate this response is an error.
+    /// Clients should be looking at the HTTP error code, but just in case they don't, this is a reliable way to check.
+    let error: Bool = true
 
-struct ApplicationErrorMiddleware: Middleware {
+    /// Error code.
+    let code: UInt
 
-    private struct ErrorResponse: Encodable {
-        /// Always set to true to indicate this response is an error.
-        /// Clients should be looking at the HTTP error code, but just in case they don't, this is a reliable way to check.
-        let error: Bool = true
+    /// The reason for the error.
+    let reason: String
 
-        /// Error code.
-        let code: UInt
+    /// A brief suggestion to fix the error.
+    let suggestion: String?
 
-        /// The reason for the error.
-        let reason: String
-
-        /// A brief suggestion to fix the error.
-        let suggestion: String?
-
-        init(code: UInt = 0, reason: String, suggestion: String? = nil) {
-            self.code = code
-            self.reason = reason
-            self.suggestion = suggestion
-        }
-
-        init(from applicationError: any ApplicationError) {
-            self.init(
-                code: applicationError.code,
-                reason: applicationError.reason,
-                suggestion: applicationError.recoverySuggestion
-            )
-        }
+    init(code: UInt = 0, reason: String, suggestion: String? = nil) {
+        self.code = code
+        self.reason = reason
+        self.suggestion = suggestion
     }
 
+    init(from applicationError: any ApplicationError) {
+        self.init(
+            code: applicationError.code,
+            reason: applicationError.reason,
+            suggestion: applicationError.recoverySuggestion
+        )
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case error
+        case code
+        case reason
+        case suggestion
+    }
+}
+
+struct ApplicationErrorMiddleware: Middleware {
     func respond(
         to request: Request,
         chainingTo next: any Responder
@@ -78,6 +85,7 @@ struct ApplicationErrorMiddleware: Middleware {
     }
 }
 
+// MARK: - Helpers
 fileprivate extension Response.Body {
     init<T: Encodable>(_ value: T) {
         do {

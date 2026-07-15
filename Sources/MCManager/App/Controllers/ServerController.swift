@@ -11,7 +11,7 @@ import Vapor
 struct ServerController: MCManagerAPIRoute, RouteCollection {
     
     let logger: Logger
-    let manager: MCServerManager
+    let manager: MinecraftServerManager
     
     init(serversPath: URL, database: any Database, logger: Logger) async throws {
         self.manager = try .init(serversRoot: serversPath, logger: logger)
@@ -26,103 +26,278 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
             .requireAuthentication()
             .apiVersion(.v1)
             .grouped("servers")
-        
-        // runtime support
+            .openAPIMetadata(tags: .servers, requiresAuthentication: true)
+
+        // Fetch the supported server runtimes
         servers.get("support", use: support)
-        // default properties
+            .openAPIMetadata(
+                summary: "Fetch the supported server runtimes",
+                permissions: Permissions(servers: .createServers),
+                responses: .serverRuntimeSupportResponse
+            )
+
+        // Fetch the default server properties
         servers.get("properties", use: defaultProperties)
-        // list servers
+            .openAPIMetadata(
+                summary: "Fetch the default server properties",
+                tag: .serverProperties,
+                permissions: Permissions(servers: .readServerProperties),
+                responses: .serverPropertiesResponse
+            )
+
+        // Fetch all servers
         servers.get(use: all)
-        // create server
+            .openAPIMetadata(
+                summary: "Fetch all servers",
+                request: .fetchServersRequest,
+                responses: .minecraftServersResponse
+            )
+
+        // Create a server
         servers.post(use: create)
-        // server operations
-        servers.group(":serverID") { server in
-            server.get(use: self.server(req:))
-            server.put(use: update)
-            server.delete(use: delete)
-            
-            // status
-            server.get("info", use: info)
-            server.get("stats", use: stats)
-            
-            // properties & config
-            server.get("properties", use: properties)
-            server.put("properties", use: updateProperties)
-            
-            // execution
-            server.post("start", use: start)
-            server.post("stop", use: stop)
-            server.post("command", use: command)
-            server.get("logs", use: logs)
-            
-            // files
-            server.get("download", use: download)
-            server.group("files") { files in
-                files.get("browse", use: browseFiles)
-                files.get(use: downloadFile)
-                files.on(.POST, body: .stream, use: uploadFile)
-                files.delete(use: removeFile)
-            }
+            .openAPIMetadata(
+                summary: "Create a server",
+                request: .serverCreateRequest,
+                permissions: Permissions(servers: .createServers),
+                responses: .minecraftServerResponse
+            )
 
-            // players
-            server.group("players") { players in
-                players.get("operators", use: operators)
-                players.post("operators", use: addOperator)
-                players.delete("operators", use: removeOperator)
+        // Server operations
+        let server = servers.grouped(":serverID")
+            .openAPIResponse(.serverNotFoundResponse)
+        // Fetch a server
+        server.get(use: self.server(req:))
+            .openAPIMetadata(
+                summary: "Fetch a server",
+                responses: .minecraftServerResponse
+            )
+        // Edit a server
+        server.put(use: update)
+            .openAPIMetadata(
+                summary: "Edit a server",
+                request: .serverEditRequest,
+                permissions: Permissions(servers: .editServers),
+                responses: .minecraftServerResponse
+            )
+        // Delete a server
+        server.delete(use: delete)
+            .openAPIMetadata(
+                summary: "Delete a server",
+                permissions: Permissions(servers: .deleteServers),
+                responses: .success("Server deleted")
+            )
+        // Fetch the status of a server
+        server.get("info", use: info)
+            .openAPIMetadata(
+                summary: "Fetch the status of a server",
+                responses: .serverInfoResponse
+            )
+        // Fetch the system resources usage of a server
+        server.get("stats", use: stats)
+            .openAPIMetadata(
+                summary: "Fetch the system resources usage of a server",
+                responses: .serverStatsResponse
+            )
+        // Fetch Minecraft server properties
+        server.get("properties", use: properties)
+            .openAPIMetadata(
+                summary: "Fetch Minecraft server properties",
+                tag: .serverProperties,
+                permissions: Permissions(servers: .readServerProperties),
+                responses: .serverPropertiesResponse
+            )
+        // Edit Minecraft server properties
+        server.put("properties", use: updateProperties)
+            .openAPIMetadata(
+                summary: "Edit Minecraft server properties",
+                tag: .serverProperties,
+                request: .serverPropertiesRequest,
+                permissions: Permissions(servers: .editServerProperties),
+                responses: .serverPropertiesResponse
+            )
+        // Start a Minecraft server
+        server.post("start", use: start)
+            .openAPIMetadata(
+                summary: "Start a Minecraft server",
+                permissions: Permissions(servers: .startStopServers),
+                responses: .success("Server started"), .maxRunningServersLimitReachedResponse, .serverPortInUseResponse, .serverRunningResponse
+            )
+        // Stop a Minecraft server
+        server.post("stop", use: stop)
+            .openAPIMetadata(
+                summary: "Stop a Minecraft server",
+                permissions: Permissions(servers: .startStopServers),
+                responses: .success("Server stopped"), .serverStoppedResponse
+            )
+        // Send a command to a Minecraft server
+        server.post("command", use: command)
+            .openAPIMetadata(
+                summary: "Send a command to a Minecraft server",
+                request: .sendServerCommandRequest,
+                permissions: Permissions(servers: .sendServerCommands),
+                responses: .success("Command sent"), .serverStoppedResponse
+            )
+        // Fetch the Minecraft server logs
+        server.get("logs", use: logs)
+            .openAPIMetadata(
+                summary: "Fetch the Minecraft server logs",
+                request: .fetchServerLogsRequest,
+                permissions: Permissions(servers: .readServerLogs),
+                responses: .serverLogsResponse
+            )
 
-                players.get("whitelist", use: whitelist)
-                players.post("whitelist", use: addToWhitelist)
-                players.delete("whitelist", use: removeFromWhitelist)
+        // Download server zip
+        server.get("download", use: download)
+            .openAPIMetadata(
+                summary: "Download server zip",
+                tag: .serverFiles,
+                permissions: Permissions(servers: .downloadServer),
+                responses: .serverArchiveResponse, .serverRunningResponse
+            )
 
-                players.get("banned", use: bannedPlayers)
-                players.post("banned", use: banPlayer)
-                players.delete("banned", use: unbanPlayer)
-            }
-        }
+        // Serer files
+        let serverFiles = server.grouped("files")
+            .openAPIMetadata(tags: .serverFiles)
+        // Browse server files
+        serverFiles.get("browse", use: browseFiles)
+            .openAPIMetadata(
+                summary: "Browse server files",
+                request: .serverFilesRequest,
+                responses: .serverFilesResponse, .serverFileDoesNotExistResponse
+            )
+        // Download a server file
+        serverFiles.get(use: downloadFile)
+            .openAPIMetadata(
+                summary: "Download a server file",
+                request: .serverFilesRequest,
+                permissions: Permissions(servers: .downloadServerFiles),
+                responses: .serverFileDownloadResponse, .serverFileDoesNotExistResponse
+            )
+        // Upload a file to the server directory
+        serverFiles.on(.POST, body: .stream, use: uploadFile)
+            .openAPIMetadata(
+                summary: "Upload a file to the server directory",
+                request: .serverFileUploadRequest,
+                permissions: Permissions(servers: .uploadServerFiles),
+                responses: .success("File uploaded")
+            )
+        // Delete a server file
+        serverFiles.delete(use: removeFile)
+            .openAPIMetadata(
+                summary: "Delete a server file",
+                request: .serverFilesRequest,
+                permissions: Permissions(servers: .deleteServerFiles),
+                responses: .success("File deleted"), .serverFileDoesNotExistResponse
+            )
+
+        // Player configurations
+        let players = server.grouped("players")
+            .openAPIMetadata(tags: .serverPlayerManagement)
+
+        // Fetch the server operators
+        players.get("operators", use: operators)
+            .openAPIMetadata(
+                summary: "Fetch the server operators",
+                permissions: Permissions(servers: .manageOperators),
+                responses: .serverOperatorsResponse
+            )
+        // Add a server operator
+        players.post("operators", use: addOperator)
+            .openAPIMetadata(
+                summary: "Add a server operator",
+                request: .addServerOperatorRequest,
+                permissions: Permissions(servers: .manageOperators),
+                responses: .success("Operator added")
+            )
+        // Remove a server operator
+        players.delete("operators", use: removeOperator)
+            .openAPIMetadata(
+                summary: "Remove a server operator",
+                request: .removeServerOperatorRequest,
+                permissions: Permissions(servers: .manageOperators),
+                responses: .success("Operator removed")
+            )
+
+        // Fetch the server whitelist
+        players.get("whitelist", use: whitelist)
+            .openAPIMetadata(
+                summary: "Fetch the server whitelist",
+                responses: .serverWhitelistResponse
+            )
+        // Add a player to the server whitelist
+        players.post("whitelist", use: addToWhitelist)
+            .openAPIMetadata(
+                summary: "Add a player to the server whitelist",
+                request: .addWhitelistedPlayerRequest,
+                permissions: Permissions(servers: .manageWhitelist),
+                responses: .success("Player added")
+            )
+        // Remove a player from the server whitelist
+        players.delete("whitelist", use: removeFromWhitelist)
+            .openAPIMetadata(
+                summary: "Remove a player from the server whitelist",
+                request: .removeWhitelistedPlayerRequest,
+                permissions: Permissions(servers: .manageWhitelist),
+                responses: .success("Player removed")
+            )
+
+        // Fetch the banned players on a server
+        players.get("banned", use: bannedPlayers)
+            .openAPIMetadata(
+                summary: "Fetch the banned players on a server",
+                permissions: Permissions(servers: .manageBannedPlayers),
+                responses: .serverBannedPlayersResponse
+            )
+        // Ban a player on the server
+        players.post("banned", use: banPlayer)
+            .openAPIMetadata(
+                summary: "Ban a player on the server",
+                request: .banPlayerRequest,
+                permissions: Permissions(servers: .manageBannedPlayers),
+                responses: .success("Player banned")
+            )
+        // Pardon a player on the server (remove the ban)
+        players.delete("banned", use: unbanPlayer)
+            .openAPIMetadata(
+                summary: "Pardon a player on the server (remove the ban)",
+                request: .pardonPlayerRequest,
+                permissions: Permissions(servers: .manageBannedPlayers),
+                responses: .success("Player pardoned")
+            )
     }
     
     // MARK: - Server management
     
-    func all(req: Request) async throws -> [MCServer] {
-        var filters = [DatabaseQuery.Filter]()
-        
-        // server type filter
-        if let serverType = req.query[MCServer.ServerType.self, at: "type"] {
+    func all(req: Request) async throws -> [MinecraftServer] {
+        let fetchRequest = try req.query.decode(MinecraftServerFetchRequest.self)
+
+        // Collect all the query filters:
+        var filters: [DatabaseQuery.Filter] = []
+        // * server type
+        if let serverType = fetchRequest.type {
             filters.append(.value(
-                .path([MCServer.FieldKeys.type.rawValue], schema: MCServer.schema),
+                .path([MinecraftServer.FieldKeys.type.rawValue], schema: MinecraftServer.schema),
                 .equal,
                 .enumCase(serverType.rawValue)
             ))
         }
-        
-        var query = MCServer.query(on: req.db)
+
+        var query = MinecraftServer.query(on: req.db)
         for filter in filters {
             query = query.filter(filter)
         }
         return try await query.all()
     }
     
-    func create(req: Request) async throws -> MCServer {
+    func create(req: Request) async throws -> MinecraftServer {
         guard try await req.userHasPermissions(for: .createServers) else {
             throw UserError.unauthorized
         }
-        let newServer = try req.content.decode(MCServer.self)
+        let createRequest = try req.content.decode(MinecraftServerRequest.self)
         let settings = try await settings(on: req.db)
 
-        // Hard checks:
-        // * non-empty server name
-        if newServer.name.isEmpty {
-            throw MCServerError.missingServerName
-        }
-        // * the version needs to be valid
-        if newServer.version == .none {
-            throw MCServerError.invalidVersion
-        }
-        // * the port must be in the allowed range
-        if !settings.allowedServerPortsData.contains(newServer.port) {
-            throw MCServerError.invalidPort(newServer.port)
-        }
-
+        // Create the new server
+        let newServer = try MinecraftServer(with: createRequest, settings: settings)
         try await newServer.save(on: req.db)
         do {
             try await manager.add(server: newServer)
@@ -135,41 +310,20 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         return newServer
     }
     
-    func server(req: Request) async throws -> MCServer {
+    func server(req: Request) async throws -> MinecraftServer {
         try await req.server
     }
     
-    func update(req: Request) async throws -> MCServer {
+    func update(req: Request) async throws -> MinecraftServer {
         guard try await req.userHasPermissions(for: .editServers) else {
             throw UserError.unauthorized
         }
         let server = try await req.server
-        let updateRequest = try req.content.decode(MCServer.self)
+        let editRequest = try req.content.decode(MinecraftServerRequest.self)
         let settings = try await settings(on: req.db)
 
-        // Hard checks:
-        // * non-empty server name
-        if updateRequest.name.isEmpty {
-            throw MCServerError.missingServerName
-        }
-        // * server type can be changed after creation
-        if updateRequest.type != server.type {
-            throw MCServerError.typeCantBeChanged
-        }
-        // * the version needs to be valid
-        if updateRequest.version == .none {
-            throw MCServerError.invalidVersion
-        }
-        // * the port must be in the allowed range
-        if !settings.allowedServerPortsData.contains(updateRequest.port) {
-            throw MCServerError.invalidPort(updateRequest.port)
-        }
-
-        // Update the server:
-        server.name = updateRequest.name
-        server.version = updateRequest.version
-        server.port = updateRequest.port
-        server.updatedAt = .now
+        // Update the server (also validates update request)
+        try server.update(with: editRequest, settings: settings)
 
         try await server.save(on: req.db)
         do {
@@ -191,8 +345,9 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         let server = try await req.server
 
         // Check if the server is running
-        if try await manager.info(for: serverID).status == .running {
-            throw MCServerError.invalidAction(.serverIsRunning)
+        let serverStatus = try await manager.info(for: serverID).status
+        if case .running = serverStatus {
+            throw MinecraftServerError.running
         }
 
         try await server.delete(on: req.db)
@@ -205,12 +360,12 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
             throw error
         }
         await deleteStatusCache(for: serverID, on: req.db)
-        return .noContent
+        return .ok
     }
     
     // MARK: - Runtime support
     
-    func support(req: Request) async throws -> [MCServer.RuntimeSupport] {
+    func support(req: Request) async throws -> [MinecraftServer.RuntimeSupport] {
         guard try await req.userHasPermissions(for: .createServers) else {
             throw UserError.unauthorized
         }
@@ -223,7 +378,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         if let cachedData = cachedRuntimeSupports.first,
            !settings.serverSupportCacheIsExpired(cachedData) {
             return cachedRuntimeSupports.map {
-                MCServer.RuntimeSupport(with: $0)
+                MinecraftServer.RuntimeSupport(with: $0)
             }
         }
         else {
@@ -250,13 +405,13 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         static let shared = ServerStatusCacheManager()
 
         typealias RefreshTask = Task<ServerStatusCache, Error>
-        private var activeRefreshes: [MCServer.IDValue : RefreshTask] = [:]
+        private var activeRefreshes: [MinecraftServer.IDValue : RefreshTask] = [:]
 
         func serverStatus(
-            for serverID: MCServer.IDValue,
+            for serverID: MinecraftServer.IDValue,
             on database: Database,
             with settings: Settings,
-            manager: MCServerManager
+            manager: MinecraftServerManager
         ) async throws -> ServerStatusCache? {
             guard settings.serverStatusCacheIsEnabled else { return nil }
 
@@ -294,7 +449,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         }
     }
     
-    func info(req: Request) async throws -> MCServer.Info {
+    func info(req: Request) async throws -> MinecraftServer.Info {
         let serverID = try req.serverID
         let status = try await ServerStatusCacheManager.shared.serverStatus(
             for: serverID,
@@ -308,7 +463,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         return info
     }
     
-    func stats(req: Request) async throws -> MCServer.Stats {
+    func stats(req: Request) async throws -> MinecraftServer.Stats {
         let serverID = try req.serverID
         let status = try await ServerStatusCacheManager.shared.serverStatus(
             for: serverID,
@@ -324,14 +479,14 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
     
     // MARK: - Properties & config
     
-    func defaultProperties(req: Request) async throws -> MCServer.Properties {
+    func defaultProperties(req: Request) async throws -> MinecraftServer.Properties {
         guard try await req.userHasPermissions(for: .readServerProperties) else {
             throw UserError.unauthorized
         }
-        return MCServer.Properties.defaults
+        return MinecraftServer.Properties.defaults
     }
     
-    func properties(req: Request) async throws -> MCServer.Properties {
+    func properties(req: Request) async throws -> MinecraftServer.Properties {
         guard try await req.userHasPermissions(for: .readServerProperties) else {
             throw UserError.unauthorized
         }
@@ -339,12 +494,12 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         return try await manager.properties(for: serverID)
     }
     
-    func updateProperties(req: Request) async throws -> MCServer.Properties {
+    func updateProperties(req: Request) async throws -> MinecraftServer.Properties {
         guard try await req.userHasPermissions(for: .editServerProperties) else {
             throw UserError.unauthorized
         }
         let serverID = try req.serverID
-        let properties = try req.content.decode(MCServer.Properties.self)
+        let properties = try req.content.decode(MinecraftServer.Properties.self)
         try await manager.updateProperties(properties, for: serverID)
         return try await manager.properties(for: serverID)
     }
@@ -358,7 +513,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         let serverID = try req.serverID
         let settings = try await settings(on: req.db)
         guard await manager.runningServersCount < settings.maxRunningServers else {
-            throw MCServerError.invalidAction(.tooManyRunningServers)
+            throw MinecraftServerError.tooManyRunningServers
         }
         try await manager.startServer(with: serverID)
         // invalidate the status cache
@@ -383,7 +538,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         }
         let serverID = try req.serverID
         guard let command = try? req.content.decode(String.self) else {
-            throw MCServerError.invalidAction(.invalidCommand)
+            throw MinecraftServerError.invalidCommand
         }
         try await manager.sendCommand(command, to: serverID)
         return .ok
@@ -394,11 +549,9 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
             throw UserError.unauthorized
         }
         let serverID = try req.serverID
-        var tail: UInt? = nil
-        if let tailValue = req.query[UInt.self, at: "tail"] {
-            tail = UInt(tailValue)
-        }
-        return try await manager.logs(for: serverID, tail: tail)
+        let fetchRequest = try req.query.decode(MinecraftServerFetchLogsRequest.self)
+
+        return try await manager.logs(for: serverID, tail: fetchRequest.tail)
     }
     
     // MARK: - File management
@@ -415,9 +568,10 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
     
     func browseFiles(req: Request) async throws -> FileBrowser {
         let serverID = try req.serverID
-        let relativePath = req.query[String.self, at: "path"]
-        if try await manager.file(at: relativePath ?? "", from: serverID) == nil {
-            throw MCServerError.invalidAction(.fileDoesNotExist)
+        let fileRequest = try req.query.decode(FileRequest.self)
+        let relativePath = fileRequest.path ?? ""
+        if try await manager.file(at: relativePath, from: serverID) == nil {
+            throw MinecraftServerError.fileDoesNotExist
         }
         return FileBrowser(
             relativePath: relativePath,
@@ -440,7 +594,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         }
         catch {
             logger.error("Failed to upload file: \(error)")
-            throw MCServerError.systemError(error)
+            throw MinecraftServerError.systemError(error)
         }
         
         try await manager.saveFile(
@@ -457,11 +611,12 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
             throw UserError.unauthorized
         }
         let serverID = try req.serverID
-        guard let relativePath = req.query[String.self, at: "path"],
-              try await manager.file(at: relativePath, from: serverID) != nil else {
-            throw MCServerError.invalidAction(.fileDoesNotExist)
+        let fileRequest = try req.query.decode(FileRequest.self)
+        guard let filePath = fileRequest.path,
+              try await manager.file(at: filePath, from: serverID) != nil else {
+            throw MinecraftServerError.fileDoesNotExist
         }
-        try await manager.removeFile(at: relativePath, for: serverID)
+        try await manager.removeFile(at: filePath, for: serverID)
         return .ok
     }
     
@@ -470,9 +625,10 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
             throw UserError.unauthorized
         }
         let serverID = try req.serverID
-        guard let relativePath = req.query[String.self, at: "path"],
-              let fileURL = try await manager.file(at: relativePath, from: serverID) else {
-            throw MCServerError.invalidAction(.fileDoesNotExist)
+        let fileRequest = try req.query.decode(FileRequest.self)
+        guard let filePath = fileRequest.path,
+              let fileURL = try await manager.file(at: filePath, from: serverID) else {
+            throw MinecraftServerError.fileDoesNotExist
         }
         let downloadSession = try FileDownloadSession(for: req, url: fileURL)
         return downloadSession.get()
@@ -480,7 +636,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
 
     // MARK: Player management
 
-    func operators(req: Request) async throws -> [MCServer.Operator] {
+    func operators(req: Request) async throws -> [MinecraftServer.Operator] {
         // users must have the manageOperators permission
         guard try await req.userHasPermissions(for: .manageOperators) else {
             throw UserError.unauthorized
@@ -497,19 +653,19 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         let serverID = try req.serverID
 
         // two supported request formats
-        let opAddRequest = try req.content.decode(MCServer.Operator?.self)
-        let playerAddRequest = try req.content.decode(MCPlayerInfo?.self)
+        let opAddRequest = try req.content.decode(MinecraftServer.Operator?.self)
+        let playerAddRequest = try req.content.decode(MinecraftPlayerInfo?.self)
 
         // the requested player must exist
         let playerID = opAddRequest?.id ?? playerAddRequest?.id
         let playerName = opAddRequest?.name ?? playerAddRequest?.name
         guard let playerName else {
-            throw MCServerError.invalidPlayerAccount
+            throw MinecraftServerError.invalidPlayerAccount
         }
         let playerInfo = try await ensurePlayerExists(playerName, id: playerID, for: req)
 
         // If the level is `nil` we need to fetch the default server operator level from the server properties
-        var opLevel: MCServer.Operator.Level
+        var opLevel: MinecraftServer.Operator.Level
         if let level = opAddRequest?.level {
             opLevel = level
         }
@@ -524,7 +680,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         }
 
         // Create the add request
-        let op = MCServer.Operator(
+        let op = MinecraftServer.Operator(
             id: playerInfo.id,
             name: playerInfo.name,
             level: opLevel,
@@ -540,7 +696,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
             throw UserError.unauthorized
         }
         let serverID = try req.serverID
-        let removeRequest = try req.content.decode(MCPlayerInfo.self)
+        let removeRequest = try req.content.decode(MinecraftPlayerInfo.self)
 
         // the requested player must exist
         let playerInfo = try await ensurePlayerExists(removeRequest.name, id: removeRequest.id, for: req)
@@ -551,11 +707,11 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         return .ok
     }
 
-    func whitelist(req: Request) async throws -> [MCPlayerInfo] {
+    func whitelist(req: Request) async throws -> [MinecraftPlayerInfo] {
         // all logged in users can see the whitelist, no permissions required
         let serverID = try req.serverID
         return try await manager.whitelist(for: serverID).map {
-            MCPlayerInfo(id: $0.id, name: $0.name)
+            MinecraftPlayerInfo(id: $0.id, name: $0.name)
         }
     }
 
@@ -565,7 +721,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
             throw UserError.unauthorized
         }
         let serverID = try req.serverID
-        let addRequest = try req.content.decode(MCPlayerInfo.self)
+        let addRequest = try req.content.decode(MinecraftPlayerInfo.self)
 
         // the requested player must exist
         let playerInfo = try await ensurePlayerExists(addRequest.name, id: addRequest.id, for: req)
@@ -582,7 +738,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
             throw UserError.unauthorized
         }
         let serverID = try req.serverID
-        let removeRequest = try req.content.decode(MCPlayerInfo.self)
+        let removeRequest = try req.content.decode(MinecraftPlayerInfo.self)
 
         // the requested player must exist
         let playerInfo = try await ensurePlayerExists(removeRequest.name, id: removeRequest.id, for: req)
@@ -593,7 +749,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         return .ok
     }
 
-    func bannedPlayers(req: Request) async throws -> [MCServer.BannedPlayer] {
+    func bannedPlayers(req: Request) async throws -> [MinecraftServer.BannedPlayer] {
         // users must have the manageBannedPlayers permission
         guard try await req.userHasPermissions(for: .manageBannedPlayers) else {
             throw UserError.unauthorized
@@ -610,14 +766,14 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         let serverID = try req.serverID
 
         // two supported request formats
-        let banRequest = try req.content.decode(MCServer.BannedPlayer?.self)
-        let playerBanRequest = try req.content.decode(MCPlayerInfo?.self)
+        let banRequest = try req.content.decode(MinecraftServer.BannedPlayer?.self)
+        let playerBanRequest = try req.content.decode(MinecraftPlayerInfo?.self)
 
         // the requested player must exist
         let playerID = banRequest?.id ?? playerBanRequest?.id
         let playerName = banRequest?.name ?? playerBanRequest?.name
         guard let playerName else {
-            throw MCServerError.invalidPlayerAccount
+            throw MinecraftServerError.invalidPlayerAccount
         }
         let playerInfo = try await ensurePlayerExists(playerName, id: playerID, for: req)
 
@@ -633,7 +789,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
             throw UserError.unauthorized
         }
         let serverID = try req.serverID
-        let removeRequest = try req.content.decode(MCPlayerInfo.self)
+        let removeRequest = try req.content.decode(MinecraftPlayerInfo.self)
 
         // the requested player must exist
         let playerInfo = try await ensurePlayerExists(removeRequest.name, id: removeRequest.id, for: req)
@@ -656,7 +812,7 @@ fileprivate extension ServerController {
     /// Load all existing servers from the given database into the current runtime
     func loadExistingServers(from database: Database) async throws {
         logger.info("Loading existing servers")
-        let servers = try await MCServer.query(on: database).all()
+        let servers = try await MinecraftServer.query(on: database).all()
         logger.notice("Found \(servers.count) existing server(s)")
         for server in servers {
             try await manager.add(server: server)
@@ -664,7 +820,7 @@ fileprivate extension ServerController {
     }
 
     /// Wipe the status cache for the given server.
-    func deleteStatusCache(for serverID: MCServer.IDValue, on database: Database) async {
+    func deleteStatusCache(for serverID: MinecraftServer.IDValue, on database: Database) async {
         do {
             try await ServerStatusCache.find(serverID, on: database)?.delete(on: database)
         }
@@ -674,19 +830,19 @@ fileprivate extension ServerController {
     }
 
     /// Ensure a requested Minecraft account exists on Mojang's servers and return that players info.
-    func ensurePlayerExists(_ playerName: String, id: MCPlayerInfo.ID, for req: Request) async throws -> MCPlayerInfo {
-        let playerInfo: MCPlayerInfo
+    func ensurePlayerExists(_ playerName: String, id: MinecraftPlayerInfo.ID, for req: Request) async throws -> MinecraftPlayerInfo {
+        let playerInfo: MinecraftPlayerInfo
         do {
             playerInfo = try await req.client.minecraftPlayerInfo(for: playerName)
         }
         catch {
-            throw MCServerError.invalidPlayerAccount
+            throw MinecraftServerError.invalidPlayerAccount
         }
         guard let playerID = playerInfo.id else {
-            throw MCServerError.invalidPlayerAccount
+            throw MinecraftServerError.invalidPlayerAccount
         }
         if let requestID = id, playerID != requestID {
-            throw MCServerError.invalidPlayerAccount
+            throw MinecraftServerError.invalidPlayerAccount
         }
         return playerInfo
     }
@@ -697,21 +853,21 @@ fileprivate extension Request {
     var serverID: UUID {
         get throws {
             guard let id = self.parameters.get("serverID") else {
-                throw MCServerError.invalidID(nil)
+                throw MinecraftServerError.invalidID
             }
             guard let uuid = UUID(uuidString: id) else {
-                throw MCServerError.invalidID(id)
+                throw MinecraftServerError.invalidID
             }
             return uuid
         }
     }
     
-    var server: MCServer {
+    var server: MinecraftServer {
         get async throws {
             let serverID = try serverID
-            let server = try await MCServer.find(serverID, on: self.db)
+            let server = try await MinecraftServer.find(serverID, on: self.db)
             guard let server else {
-                throw MCServerError.notFound(serverID)
+                throw MinecraftServerError.notFound
             }
             return server
         }

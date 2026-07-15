@@ -8,9 +8,6 @@ fileprivate let defaultAPIPort: Int = 8000
 
 // configures your application
 public func configure(_ app: Application) async throws {
-    // uncomment to serve files from /Public folder
-    // app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
-    
     // Server name
     app.http.server.configuration.serverName = "MCManager"
     
@@ -69,7 +66,7 @@ fileprivate func migrateDatabase(_ app: Application) async throws {
     Role.migrations.forEach { app.migrations.add($0) }
     User.migrations.forEach { app.migrations.add($0) }
     SessionToken.migrations.forEach { app.migrations.add($0) }
-    MCServer.migrations.forEach { app.migrations.add($0) }
+    MinecraftServer.migrations.forEach { app.migrations.add($0) }
     ServerStatusCache.migrations.forEach { app.migrations.add($0) }
     ServerRuntimeSupportCache.migrations.forEach { app.migrations.add($0) }
 

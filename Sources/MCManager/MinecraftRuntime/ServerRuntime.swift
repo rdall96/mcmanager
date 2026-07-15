@@ -10,7 +10,7 @@ import DockerSwiftAPI
 import Logging
 import RegexBuilder
 
-final actor ServerRuntime: Identifiable {
+final actor MinecraftServerRuntime: Identifiable {
     typealias Command = String
     
     private let logger: Logger
@@ -20,23 +20,23 @@ final actor ServerRuntime: Identifiable {
     /// Path of the server files on disk
     nonisolated let path: URL
     /// Type of Minecraft server
-    nonisolated let type: MCServer.ServerType
+    nonisolated let type: MinecraftServer.ServerType
     /// Version of Minecraft
-    private(set) var version: MCServer.Version
+    private(set) var version: MinecraftServer.Version
     /// Port this server is hosted on
-    private(set) var port: MCServer.Port
+    private(set) var port: MinecraftServer.Port
     /// Minecraft server properties
-    var properties: MCServer.Properties
+    var properties: MinecraftServer.Properties
     /// Status of the Minecraft server
-    private var status: MCServer.Status = .unknown
+    private var status: MinecraftServer.Status = .unknown
     /// Docker process (container) that the server is wrapped in
     internal var process: Docker.Container
     /// This is used to signal when the process needs to be updated on the next start
     private var processNeedsUpdate: Bool = false
     
-    init(info: MCServer, rootPath: URL, logger: Logger? = nil) async throws {
+    init(info: MinecraftServer, rootPath: URL, logger: Logger? = nil) async throws {
         guard let id = info.id else {
-            throw MCServerError.invalidID(info.id)
+            throw MinecraftServerError.invalidID
         }
         self.id = id
         self.logger = logger ?? Logger(label: "mcmanager.server.\(id.uuidString)")
@@ -50,7 +50,7 @@ final actor ServerRuntime: Identifiable {
         port = info.port
         
         // Read the properties
-        properties = try MCServer.Properties.read(
+        properties = try MinecraftServer.Properties.read(
             at: path.appendingPathComponent(Defaults.serverPropertiesFileName),
             createDefault: true
         )
@@ -72,7 +72,7 @@ final actor ServerRuntime: Identifiable {
             }
             catch {
                 self.logger.critical("Failed to create server \(id.uuidString). \(error)")
-                throw MCServerError.systemError(error)
+                throw MinecraftServerError.systemError(error)
             }
         }
         
@@ -89,9 +89,9 @@ final actor ServerRuntime: Identifiable {
     
     // MARK: - Methods
     
-    func update(_ info: MCServer) throws {
+    func update(_ info: MinecraftServer) throws {
         guard let id = info.id, self.id == id else {
-            throw MCServerError.invalidID(info.id)
+            throw MinecraftServerError.invalidID
         }
         version = info.version
         port = info.port
@@ -110,12 +110,12 @@ final actor ServerRuntime: Identifiable {
         }
         catch {
             logger.error("Failed to delete server: \(error)")
-            throw MCServerError.systemError(error)
+            throw MinecraftServerError.systemError(error)
         }
     }
     
     /// Update the server config (aka: server properties). This also supports partial updates
-    func updateProperties(_ newProperties: MCServer.Properties) throws {
+    func updateProperties(_ newProperties: MinecraftServer.Properties) throws {
         properties.update(with: newProperties)
         do {
             // write the new config to disk
@@ -123,7 +123,7 @@ final actor ServerRuntime: Identifiable {
         }
         catch {
             logger.error("Failed to update server properties: \(error)")
-            throw MCServerError.systemError(error)
+            throw MinecraftServerError.systemError(error)
         }
         // Signal that we need to update the process the next time it starts
         processNeedsUpdate = true
@@ -155,7 +155,7 @@ final actor ServerRuntime: Identifiable {
         }
         catch {
             logger.error("Failed to list server files: \(error)")
-            throw MCServerError.systemError(error)
+            throw MinecraftServerError.systemError(error)
         }
         
         // Remove files we don't want to surface
@@ -165,7 +165,7 @@ final actor ServerRuntime: Identifiable {
     
     nonisolated func saveFile(at url: URL, to relativePath: String) async throws {
         if await isRunning {
-            throw MCServerError.invalidAction(.serverIsRunning)
+            throw MinecraftServerError.running
         }
         do {
             try FileManager.default.copyItem(
@@ -175,7 +175,7 @@ final actor ServerRuntime: Identifiable {
         }
         catch {
             logger.error("Failed to save file: \(error)")
-            throw MCServerError.systemError(error)
+            throw MinecraftServerError.systemError(error)
         }
     }
     
@@ -186,7 +186,7 @@ final actor ServerRuntime: Identifiable {
         }
         catch {
             logger.error("Failed to delete file at \(relativePath): \(error)")
-            throw MCServerError.systemError(error)
+            throw MinecraftServerError.systemError(error)
         }
     }
     
@@ -212,40 +212,40 @@ final actor ServerRuntime: Identifiable {
     // Writing: Easier, just write to both for piece of mind.
 
     /// Fetch the server operators.
-    var operators: MCServer.Operators {
+    var operators: MinecraftServer.Operators {
         get throws {
             let configurationsDirectory = path.appendingPathComponent(Defaults.serverConfigurationsDirectoryName)
             let jsonOplistURL = configurationsDirectory.appendingPathComponent(Defaults.opslistJSONFileName)
-            let jsonOplist: [MCServer.Operator] = try MCServer.readPlayerConfigurationJSON(at: jsonOplistURL)
+            let jsonOplist: [MinecraftServer.Operator] = try MinecraftServer.readPlayerConfigurationJSON(at: jsonOplistURL)
             if version >= .v1_7_6, !jsonOplist.isEmpty {
                 return Set(jsonOplist)
             }
             else {
                 let legacyOplistURL = configurationsDirectory.appendingPathComponent(Defaults.legacyOpslistTXTFileName)
-                let players = try MCServer.readLegacyPlayerConfigurationTXT(at: legacyOplistURL)
+                let players = try MinecraftServer.readLegacyPlayerConfigurationTXT(at: legacyOplistURL)
                 // convert to the new format using reasonable defaults
                 return Set(players.map {
-                    MCServer.Operator(name: $0, level: 0)
+                    MinecraftServer.Operator(name: $0, level: 0)
                 })
             }
         }
     }
 
-    private func updateOperators(_ ops: [MCServer.Operator]) throws {
+    private func updateOperators(_ ops: [MinecraftServer.Operator]) throws {
         let configurationsDirectory = path.appendingPathComponent(Defaults.serverConfigurationsDirectoryName)
         try FileManager.default.createDirectory(at: configurationsDirectory, withIntermediateDirectories: true)
-        try MCServer.updatePlayerConfigurationJSON(
+        try MinecraftServer.updatePlayerConfigurationJSON(
             at: configurationsDirectory.appendingPathComponent(Defaults.opslistJSONFileName),
             with: ops
         )
-        try MCServer.updateLegacyPlayerConfigurationTXT(
+        try MinecraftServer.updateLegacyPlayerConfigurationTXT(
             at: configurationsDirectory.appendingPathComponent(Defaults.legacyOpslistTXTFileName),
             with: ops
         )
     }
 
     /// Add a new server operator.
-    func addOperator(_ op: MCServer.Operator) async throws {
+    func addOperator(_ op: MinecraftServer.Operator) async throws {
         var ops = Array(try operators)
         ops.removeAll { $0 == op }
         ops.append(op)
@@ -259,8 +259,8 @@ final actor ServerRuntime: Identifiable {
     }
 
     /// Remove a server operator (de-op).
-    func removeOperator(_ player: MCPlayerInfo) async throws {
-        let op = MCServer.Operator(player)
+    func removeOperator(_ player: MinecraftPlayerInfo) async throws {
+        let op = MinecraftServer.Operator(player)
         var ops = Array(try operators)
         ops.removeAll { $0 == op }
         try updateOperators(ops)
@@ -273,41 +273,41 @@ final actor ServerRuntime: Identifiable {
     }
 
     /// Fetch the server whitelist.
-    var whitelist: MCServer.Whitelist {
+    var whitelist: MinecraftServer.Whitelist {
         get throws {
             let configurationsDirectory = path.appendingPathComponent(Defaults.serverConfigurationsDirectoryName)
             let whitelistURL = configurationsDirectory.appendingPathComponent(Defaults.whitelistJSONFileName)
-            let whitelist: MCServer.Whitelist = Set(try MCServer.readPlayerConfigurationJSON(at: whitelistURL))
+            let whitelist: MinecraftServer.Whitelist = Set(try MinecraftServer.readPlayerConfigurationJSON(at: whitelistURL))
             if version >= .v1_7_6, !whitelist.isEmpty {
                 return whitelist
             }
             else {
                 let legacyWhitelistURL = configurationsDirectory.appendingPathComponent(Defaults.legacyWhitelistTXTFileName)
-                let players = try MCServer.readLegacyPlayerConfigurationTXT(at: legacyWhitelistURL)
+                let players = try MinecraftServer.readLegacyPlayerConfigurationTXT(at: legacyWhitelistURL)
                 // convert to the new format using reasonable defaults
                 return Set(players.map {
-                    MCServer.WhitelistedPlayer(name: $0)
+                    MinecraftServer.WhitelistedPlayer(name: $0)
                 })
             }
         }
     }
 
-    private func updateWhitelist(_ whitelistedPlayers: [MCServer.WhitelistedPlayer]) throws {
+    private func updateWhitelist(_ whitelistedPlayers: [MinecraftServer.WhitelistedPlayer]) throws {
         let configurationsDirectory = path.appendingPathComponent(Defaults.serverConfigurationsDirectoryName)
         try FileManager.default.createDirectory(at: configurationsDirectory, withIntermediateDirectories: true)
-        try MCServer.updatePlayerConfigurationJSON(
+        try MinecraftServer.updatePlayerConfigurationJSON(
             at: configurationsDirectory.appendingPathComponent(Defaults.whitelistJSONFileName),
             with: whitelistedPlayers
         )
-        try MCServer.updateLegacyPlayerConfigurationTXT(
+        try MinecraftServer.updateLegacyPlayerConfigurationTXT(
             at: configurationsDirectory.appendingPathComponent(Defaults.legacyWhitelistTXTFileName),
             with: whitelistedPlayers
         )
     }
 
     /// Add a player to the server whitelist.
-    func whitelistPlayer(_ player: MCPlayerInfo) async throws {
-        let whitelistedPlayer = MCServer.WhitelistedPlayer(player)
+    func whitelistPlayer(_ player: MinecraftPlayerInfo) async throws {
+        let whitelistedPlayer = MinecraftServer.WhitelistedPlayer(player)
         var whitelist = Array(try whitelist)
         whitelist.removeAll { $0 == whitelistedPlayer }
         whitelist.append(whitelistedPlayer)
@@ -319,8 +319,8 @@ final actor ServerRuntime: Identifiable {
     }
 
     /// Remove a player from the whitelist.
-    func removeWhitelistedPlayer(_ player: MCPlayerInfo) async throws {
-        let whitelistedPlayer = MCServer.WhitelistedPlayer(player)
+    func removeWhitelistedPlayer(_ player: MinecraftPlayerInfo) async throws {
+        let whitelistedPlayer = MinecraftServer.WhitelistedPlayer(player)
         var whitelist = Array(try whitelist)
         whitelist.removeAll { $0 == whitelistedPlayer }
         try updateWhitelist(whitelist)
@@ -330,41 +330,41 @@ final actor ServerRuntime: Identifiable {
         }
     }
 
-    var bannedPlayers: MCServer.BannedPlayers {
+    var bannedPlayers: MinecraftServer.BannedPlayers {
         get throws {
             let configurationsDirectory = path.appendingPathComponent(Defaults.serverConfigurationsDirectoryName)
             let jsonBanlistURL = configurationsDirectory.appendingPathComponent(Defaults.banlistJSONFileName)
-            let jsonBanlist: MCServer.BannedPlayers = Set(try MCServer.readPlayerConfigurationJSON(at: jsonBanlistURL))
+            let jsonBanlist: MinecraftServer.BannedPlayers = Set(try MinecraftServer.readPlayerConfigurationJSON(at: jsonBanlistURL))
             if version >= .v1_7_6, !jsonBanlist.isEmpty {
                 return jsonBanlist
             }
             else {
                 let legacyBanlistURL = configurationsDirectory.appendingPathComponent(Defaults.legacyBanlistTXTFileName)
-                let players = try MCServer.readLegacyPlayerConfigurationTXT(at: legacyBanlistURL)
+                let players = try MinecraftServer.readLegacyPlayerConfigurationTXT(at: legacyBanlistURL)
                 // convert to the new format using reasonable defaults
                 return Set(players.map {
-                    MCServer.BannedPlayer(name: $0)
+                    MinecraftServer.BannedPlayer(name: $0)
                 })
             }
         }
     }
 
-    private func updateBannedPlayers(_ bannedPlayers: [MCServer.BannedPlayer]) throws {
+    private func updateBannedPlayers(_ bannedPlayers: [MinecraftServer.BannedPlayer]) throws {
         let configurationsDirectory = path.appendingPathComponent(Defaults.serverConfigurationsDirectoryName)
         try FileManager.default.createDirectory(at: configurationsDirectory, withIntermediateDirectories: true)
-        try MCServer.updatePlayerConfigurationJSON(
+        try MinecraftServer.updatePlayerConfigurationJSON(
             at: configurationsDirectory.appendingPathComponent(Defaults.banlistJSONFileName),
             with: bannedPlayers
         )
-        try MCServer.updateLegacyPlayerConfigurationTXT(
+        try MinecraftServer.updateLegacyPlayerConfigurationTXT(
             at: configurationsDirectory.appendingPathComponent(Defaults.legacyBanlistTXTFileName),
             with: bannedPlayers
         )
     }
 
     /// Add a new server operator.
-    func banPlayer(_ player: MCPlayerInfo, reason: String?) async throws {
-        let bannedPlayer = MCServer.BannedPlayer(player, reason: reason)
+    func banPlayer(_ player: MinecraftPlayerInfo, reason: String?) async throws {
+        let bannedPlayer = MinecraftServer.BannedPlayer(player, reason: reason)
         var bannedPlayers = Array(try bannedPlayers)
         bannedPlayers.removeAll { $0 == bannedPlayer }
         bannedPlayers.append(bannedPlayer)
@@ -378,8 +378,8 @@ final actor ServerRuntime: Identifiable {
     }
 
     /// Pardon a player (remove from the list of banned players).
-    func pardonPlayer(_ player: MCPlayerInfo) async throws {
-        let bannedPlayer = MCServer.BannedPlayer(player)
+    func pardonPlayer(_ player: MinecraftPlayerInfo) async throws {
+        let bannedPlayer = MinecraftServer.BannedPlayer(player)
         var bannedPlayers = Array(try bannedPlayers)
         bannedPlayers.removeAll { $0 == bannedPlayer }
         try updateBannedPlayers(bannedPlayers)
@@ -413,7 +413,7 @@ final actor ServerRuntime: Identifiable {
         if case .running = dockerStatus {
             // only check the status through the last 100 logs, otherwise this operation can get expensive...
             let logs = (try? await logs(tail: 100)) ?? []
-            let latestStatus = MCServer.Status.latestStatus(in: logs)
+            let latestStatus = MinecraftServer.Status.latestStatus(in: logs)
             if case .unknown = latestStatus {
                 // the logs couldn't find the exact status of the server,
                 // but since the docker process is running it's safe to assume so is the server.
@@ -424,7 +424,7 @@ final actor ServerRuntime: Identifiable {
             }
         }
         else {
-            status = MCServer.Status(with: dockerStatus)
+            status = MinecraftServer.Status(with: dockerStatus)
         }
     }
     
@@ -443,13 +443,13 @@ final actor ServerRuntime: Identifiable {
     
     private func ensureIsRunning() async throws {
         guard await isRunning else {
-            throw MCServerError.invalidAction(.serverIsStopped)
+            throw MinecraftServerError.stopped
         }
     }
     
     private func ensureIsStopped() async throws {
         if await isRunning {
-            throw MCServerError.invalidAction(.serverIsRunning)
+            throw MinecraftServerError.running
         }
     }
     
@@ -471,8 +471,8 @@ final actor ServerRuntime: Identifiable {
         // ports
         let ports: [Docker.ContainerSpec.PortMapping] = [
             // map both TCP and UDP to the container ports. TCP: game, UDP: queries
-            .init(hostPort: UInt(self.port), containerPort: UInt(Defaults.minecraftServerPort), protocol: .tcp),
-            .init(hostPort: UInt(self.port), containerPort: UInt(Defaults.minecraftServerPort), protocol: .udp),
+            .init(hostPort: UInt(self.port.rawValue), containerPort: UInt(Defaults.minecraftServerPort.rawValue), protocol: .tcp),
+            .init(hostPort: UInt(self.port.rawValue), containerPort: UInt(Defaults.minecraftServerPort.rawValue), protocol: .udp),
         ]
         
         // volumes
@@ -506,7 +506,7 @@ final actor ServerRuntime: Identifiable {
     
     /// Monitor the server start/stop cycle to accurately report the `status`
     @discardableResult
-    private func waitForStatus(_ desiredStatus: MCServer.Status, timeout: TimeInterval? = nil) async -> Bool {
+    private func waitForStatus(_ desiredStatus: MinecraftServer.Status, timeout: TimeInterval? = nil) async -> Bool {
         let startTime = Date.now
         repeat {
             // if we've hit the timeout, exit early
@@ -526,7 +526,7 @@ final actor ServerRuntime: Identifiable {
                 // continuosly search for the latest status of a container by looking at the last few logs
                 // the more logs we search through the more expensive the search gets, so limit it to the last 50 logs.
                 let logs = (try? await logs(tail: 50)) ?? []
-                let currentStatus = MCServer.Status.latestStatus(in: logs)
+                let currentStatus = MinecraftServer.Status.latestStatus(in: logs)
                 // ignore unknown statuses: the latestStatus search might not have found what it needed
                 if currentStatus != .unknown {
                     self.status = currentStatus
@@ -560,7 +560,7 @@ final actor ServerRuntime: Identifiable {
             catch {
                 status = .error
                 logger.critical("Failed to re-create container for sever \(id): \(error)")
-                throw MCServerError.systemError(error)
+                throw MinecraftServerError.systemError(error)
             }
         }
         
@@ -585,7 +585,7 @@ final actor ServerRuntime: Identifiable {
         catch {
             logger.critical("Failed to start server \(id): \(error)")
             status = .error
-            throw MCServerError.systemError(error)
+            throw MinecraftServerError.systemError(error)
         }
     }
     
@@ -608,7 +608,7 @@ final actor ServerRuntime: Identifiable {
         }
         catch {
             logger.critical("Failed to send stop command to server \(id): \(error)")
-            throw MCServerError.systemError(error)
+            throw MinecraftServerError.systemError(error)
         }
     }
     
@@ -632,14 +632,14 @@ final actor ServerRuntime: Identifiable {
             .first
         guard let pid else {
             logger.critical("No process ID found for running server \(id) to send command")
-            throw MCServerError.unknown
+            throw MinecraftServerError.unknown
         }
         do {
             try await Docker.exec("/bin/bash -c \"echo \(command.sanitized) > /proc/\(pid)/fd/0\"", in: process)
         }
         catch {
             logger.error("Failed to send command to server \(id): \(error)")
-            throw MCServerError.systemError(error)
+            throw MinecraftServerError.systemError(error)
         }
     }
     
@@ -649,14 +649,14 @@ final actor ServerRuntime: Identifiable {
         }
         catch {
             logger.error("Failed to get logs for server \(id): \(error)")
-            throw MCServerError.systemError(error)
+            throw MinecraftServerError.systemError(error)
         }
     }
     
     // MARK: - Status
     
     /// Info regarding the current server process
-    var info: MCServer.Info {
+    var info: MinecraftServer.Info {
         get async throws {
             if !(await isRunning) {
                 // use this a chance to update the status if the server was stopped for any reason
@@ -667,7 +667,7 @@ final actor ServerRuntime: Identifiable {
             var playerList = [String]()
             if status == .running {
                 // add a fairly quick timeout to the server query as we don't want to block for too long if the server isn't responding
-                let query = MCServerQuery(port: self.port, timeout: 1)
+                let query = MinecraftServerQuery(port: self.port, timeout: 1)
                 do {
                     playerList = try await query.getPlayers()
                 }
@@ -677,7 +677,7 @@ final actor ServerRuntime: Identifiable {
                 }
             }
             
-            return MCServer.Info(
+            return MinecraftServer.Info(
                 status: status,
                 needsRestart: processNeedsUpdate,
                 onlinePlayers: playerList
@@ -686,7 +686,7 @@ final actor ServerRuntime: Identifiable {
     }
     
     /// Metrics for the server process
-    var stats: MCServer.Stats {
+    var stats: MinecraftServer.Stats {
         get async throws {
             let stats: Docker.Container.Stats
             do {
@@ -694,15 +694,15 @@ final actor ServerRuntime: Identifiable {
             }
             catch {
                 logger.critical("Failed to fetch server stats from docker: \(error)")
-                throw MCServerError.systemError(error)
+                throw MinecraftServerError.systemError(error)
             }
-            return MCServer.Stats(cpuPercent: stats.cpuPercent, memoryUsage: stats.memoryUsageBytes)
+            return MinecraftServer.Stats(cpuPercent: stats.cpuPercent, memoryUsage: stats.memoryUsageBytes)
         }
     }
 }
 
 // MARK: - Defaults
-extension ServerRuntime {
+extension MinecraftServerRuntime {
     enum Defaults {
         
         /// Name for a server process
@@ -766,7 +766,7 @@ extension ServerRuntime {
         ]
         
         /// Default Minecraft server port on the container
-        static let minecraftServerPort: MCServer.Port = 25565
+        static let minecraftServerPort: MinecraftServer.Port = 25565
         
         /// Name of the Minecraft server process in the docker container
         static let serverProcessName = "start_server"
@@ -780,23 +780,23 @@ extension ServerRuntime {
 }
 
 // MARK: - Known server versions
-fileprivate extension MCServer.Version {
+fileprivate extension MinecraftServer.Version {
     /// Version 1.7.6.
     /// Minecraft switched from `white-list.txt` to `whitelist.json` in this version.
     static let v1_7_6 = Self(major: 1, minor: 7, patch: 6)
 }
 
 // MARK: - Equatable
-extension ServerRuntime: Equatable {
-    static func == (lhs: ServerRuntime, rhs: ServerRuntime) -> Bool {
+extension MinecraftServerRuntime: Equatable {
+    static func == (lhs: MinecraftServerRuntime, rhs: MinecraftServerRuntime) -> Bool {
         // same id, means this is the same server
         lhs.id == rhs.id
     }
 }
 
 // MARK: - Sanitize commands
-extension ServerRuntime.Command {
-    fileprivate var sanitized: ServerRuntime.Command {
+extension MinecraftServerRuntime.Command {
+    fileprivate var sanitized: MinecraftServerRuntime.Command {
         self
             .replacingOccurrences(of: "(", with: "\\(") // bash interprets ( and ) as something else (idk)
             .replacingOccurrences(of: ")", with: "\\)")
@@ -815,7 +815,7 @@ extension ServerRuntime.Command {
 }
 
 // MARK: - Status Regex
-extension MCServer.Status {
+extension MinecraftServer.Status {
     fileprivate static func latestStatus(in logs: [String]) -> Self {
         // the order is always the same: starting, running, stopping
         // reverse the order of the logs so that first match = most recent status

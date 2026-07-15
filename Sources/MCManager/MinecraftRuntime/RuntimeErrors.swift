@@ -7,79 +7,54 @@
 
 import Foundation
 
-enum MCServerError: LocalizedError {
-
-    /// Reason for an invalid action.
-    enum Reason {
-        case serverIsStopped
-        case serverIsRunning
-        case serverAlreadyExists
-        case portAlreadyInUse
-        case invalidCommand
-        case tooManyRunningServers
-        case fileDoesNotExist
-    }
+enum MinecraftServerError: LocalizedError {
 
     case unknown
-    case invalidID(String?)
-    case notFound(MCServer.IDValue)
-    case invalidPort(MCServer.Port)
-    case systemError(Error)
-    case invalidAction(Reason)
-    case invalidPlayerAccount
+    case notFound
+    case invalidID
+    case alreadyExists
     case missingServerName
+    case missingServerType
     case typeCantBeChanged
     case invalidVersion
+    case invalidPort
+    case stopped
+    case running
+    case portAlreadyInUse
+    case tooManyRunningServers
+    case invalidCommand
+    case fileDoesNotExist
+    case invalidPlayerAccount
+    case systemError(Error)
 
-    @_disfavoredOverload
-    static func invalidID(_ uuid: UUID?) -> Self {
-        .invalidID(uuid?.uuidString)
-    }
-
-    var errorDescription: String? {
+    var errorDescription: String {
         switch self {
         case .unknown: "An unknown error occurred."
-        case .invalidID(let string): "Invalid server ID: \(string ?? "<none>")."
-        case .notFound(let id): "Server with id \(id) not found."
-        case .invalidPort(let port): "Invalid server port: \(port). Please choose a port in the allowed port range and try again."
-        case .systemError(let error): "An error occurred! \(error.localizedDescription)"
-        case .invalidAction(let reason):
-            switch reason {
-            case .serverIsStopped: "The server is not running."
-            case .serverIsRunning: "The server is currently running."
-            case .serverAlreadyExists: "A server with this ID already exists."
-            case .portAlreadyInUse: "This port is currently in use by another server."
-            case .invalidCommand: "The provided command is not a valid server command."
-            case .tooManyRunningServers: "You have reached the maximum number servers that can run simultaneously."
-            case .fileDoesNotExist: "The requested server file does not exist."
-            }
-        case .invalidPlayerAccount: "The requested Minecraft account does not exist."
-        case .missingServerName: "A server name is required."
+        case .notFound: "Server not found."
+        case .invalidID: "Invalid server ID."
+        case .alreadyExists: "Server already exists."
+        case .missingServerName: "Missing server name."
+        case .missingServerType: "Missing server type."
         case .typeCantBeChanged: "The server type cannot be changed."
-        case .invalidVersion: "Invalid server version."
+        case .invalidVersion: "Invalid game version."
+        case .invalidPort: "Invalid server port."
+        case .stopped: "The server is stopped."
+        case .running: "The server is running."
+        case .portAlreadyInUse: "This port is currently in use by another server."
+        case .tooManyRunningServers: "You have reached the maximum number servers that can run simultaneously."
+        case .invalidCommand: "The provided command is not a valid server command."
+        case .fileDoesNotExist: "The requested server file does not exist."
+        case .invalidPlayerAccount: "The requested Minecraft account does not exist."
+        case .systemError(let error): "An runtime occurred: \(error.localizedDescription)"
         }
     }
     
     var recoverySuggestion: String? {
         switch self {
-        case .unknown: "Please try again later."
-        case .invalidID, .notFound: "Please provide a valid server ID."
-        case .invalidPort: "Please choose a port in the allowed port range and try again."
-        case .systemError: nil
-        case .invalidAction(let reason):
-            switch reason {
-            case .serverIsStopped: "Start the server and try again."
-            case .serverIsRunning: "Stop the server and try again."
-            case .serverAlreadyExists: nil
-            case .portAlreadyInUse: "Try stopping the server that is currently using this port or edit the current server to choose a different port. Then try again."
-            case .invalidCommand: "Please provide a valid server command."
-            case .tooManyRunningServers: "Stop one or more servers and try again."
-            case .fileDoesNotExist: "Please choose a file that actually exists."
-            }
-        case .invalidPlayerAccount: "The requested Minecraft account does not exist."
-        case .missingServerName: nil
-        case .typeCantBeChanged: nil
-        case .invalidVersion: nil
+        case .stopped: "Start the server and try again."
+        case .running: "Stop the server and try again."
+        case .portAlreadyInUse: "Change the server port or stop the server that is currently using this port."
+        default: nil
         }
     }
 }

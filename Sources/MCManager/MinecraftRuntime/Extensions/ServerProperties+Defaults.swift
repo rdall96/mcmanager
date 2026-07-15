@@ -7,11 +7,11 @@
 
 import Foundation
 
-extension MCServer.Properties {
+extension MinecraftServer.Properties {
 
     /// Default server property values.
     static var defaults: Self {
-        MCServer.Properties(
+        MinecraftServer.Properties(
             allowFlight: false,
             allowNether: true,
             broadcastRconToOps: false,
@@ -63,7 +63,7 @@ extension MCServer.Properties {
             return try PropertyListDecoder().decode(Self.self, from: data)
         }
         catch {
-            throw MCServerError.systemError(error)
+            throw MinecraftServerError.systemError(error)
         }
     }
     

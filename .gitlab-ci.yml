@@ -15,10 +15,10 @@ variables:
 
 
 # Manual build - On custom build tags (for testing purposes)
-manual:build:
-  stage: test
+manual:build:custom-tag:
+  stage: build
   tags:
-    - image
+    - docker
   image: docker:28.5.2-cli
   services:
     - docker:28.5.2-dind
@@ -27,7 +27,6 @@ manual:build:
     DOCKER_TLS_CERTDIR: "/certs"
   before_script:
     - docker info
-    # Login
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
     # Build and push to the private registry
@@ -44,11 +43,16 @@ dev:build:
   stage: build
   tags:
     - build
-    - swift
   image: swift:5.10-jammy
   script:
     - swift package resolve
     - swift build -c debug --static-swift-stdlib
+  artifacts:
+    name: "MCManager-binary-debug"
+    paths:
+      # Shared with next dev stages so it doesn't need to rebuild
+      - .build/debug/MCManager
+    expire_in: 1 hour
   rules:
     # don't run this for release tags
     - if: $CI_COMMIT_TAG =~ $RELEASE_TAG
@@ -67,11 +71,42 @@ dev:build:
       when: always
 
 
-# Development build - Create a dev image for testing
-dev:test:
+# Development test - Ensure the OAS file is valid and export it
+dev:test:oas:
   stage: test
   tags:
-    - image
+    - shared
+  # Plain distro image - no Swift toolchain needed, only running the binary built by dev:build.
+  # It's the same Ubuntu release as swift:5.10-jammy so glibc matches.
+  image: ubuntu:22.04
+  needs:
+    # Reuse the binary built by dev:build instead of rebuilding it here
+    - dev:build
+  before_script:
+    # Tooling needed to fetch and validate the OAS, plus runtime libs/binaries the compiled binary needs
+    # (openssh-client provides ssh-keygen, used by the app to generate its private key on first run)
+    # (tzdata provides the IANA timezone database ISO8601DateFormatter/ICU needs to initialize)
+    - export DEBIAN_FRONTEND=noninteractive
+    - apt-get update && apt-get install -y --no-install-recommends curl python3-pip openssh-client tzdata libicu70 libcurl4 libxml2 libsqlite3-0 libatomic1 zlib1g
+    - pip3 install --no-cache-dir openapi-spec-validator
+  script:
+    - ./scripts/verify-oas.sh
+  artifacts:
+    name: "MCManager-dev-OAS"
+    paths:
+      - oas.json
+    expire_in: 1 week
+  rules:
+    # Run this with every merge request
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: always
+
+
+# Development build - Create a dev image and upload it to the registry
+dev:upload:registry:
+  stage: release
+  tags:
+    - docker
   image: docker:28.5.2-cli
   services:
     - docker:28.5.2-dind
@@ -80,7 +115,6 @@ dev:test:
     DOCKER_TLS_CERTDIR: "/certs"
   before_script:
     - docker info
-    # Login
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
     # Build the image and upload to to the private registry
@@ -92,16 +126,18 @@ dev:test:
     - docker tag $PRIVATE_IMAGE:dev-$CI_COMMIT_SHORT_SHA $PRIVATE_IMAGE:dev-latest
     - docker push $PRIVATE_IMAGE:dev-latest
   rules:
-    # This job is optional for merge requests
+    # This job requires manual triggering for merge requests
+    # It's optional: leaving it untriggered (or letting it fail) must not block the MR pipeline/merge
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       when: manual
+      allow_failure: true
 
 
 # Release build - New tags matching RELEASE_TAG
 release:build:
   stage: build
   tags:
-    - image
+    - docker
   image: docker:28.5.2-cli
   services:
     - docker:28.5.2-dind
@@ -110,7 +146,6 @@ release:build:
     DOCKER_TLS_CERTDIR: "/certs"
   before_script:
     - docker info
-    # Login
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
     # Build and upload to private registry
@@ -121,11 +156,38 @@ release:build:
     - if: $CI_COMMIT_TAG =~ $RELEASE_TAG
 
 
+# Release test - Ensure the OAS file is valid and export it
+release:generate:oas:
+  stage: test
+  tags:
+    - build
+  image: swift:5.10-jammy
+  before_script:
+    # Tooling needed to fetch and validate the OAS
+    - export DEBIAN_FRONTEND=noninteractive
+    - apt-get update && apt-get install -y --no-install-recommends curl python3-pip
+    - pip3 install --no-cache-dir openapi-spec-validator
+  script:
+    # Build the app in DEBUG mode - the /oas.json endpoint is only registered in DEBUG builds
+    - swift package resolve
+    - swift build -c debug --static-swift-stdlib
+    - ./scripts/verify-oas.sh
+  artifacts:
+    name: "MCManager-OAS"
+    paths:
+      - oas.json
+    # Keep this artifact around indefinitely - the release links to it directly
+    expire_in: never
+  rules:
+    # run this when we have a release tag
+    - if: $CI_COMMIT_TAG =~ $RELEASE_TAG
+
+
 # Release - Upload the image to dockerhub
-release:dockerhub:
+release:upload:dockerhub:
   stage: release
   tags:
-    - image
+    - docker
   image: docker:28.5.2-cli
   services:
     - docker:28.5.2-dind
@@ -134,10 +196,8 @@ release:dockerhub:
     DOCKER_TLS_CERTDIR: "/certs"
   before_script:
     - docker info
-    # Login
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - docker login -u $DOCKERHUB_USER -p $DOCKERHUB_TOKEN
-    # Pull the image from the private registry
     - docker pull $PRIVATE_IMAGE:$CI_COMMIT_TAG
   script:
     # Tag and push to DockerHub
@@ -151,7 +211,7 @@ release:dockerhub:
 
 
 # Release - Create a GitLab release entry
-release:docs:
+release:publish:
   stage: release
   tags:
     - shared
@@ -170,5 +230,11 @@ release:docs:
   release:
     tag_name: $CI_COMMIT_TAG
     name: 'Release $CI_COMMIT_TAG'
-    # TODO: Find a way to add a direct link to the image
-    description: '[DockerHub - MCManager](https://hub.docker.com/repository/docker/rdall96/mcmanager/general)\n$IMAGE_NAME:$CI_COMMIT_TAG\nAutomated release (maintainer to fill in details)'
+    description: '[DockerHub - MCManager](https://hub.docker.com/repository/docker/rdall96/mcmanager/general)\n$PUBLIC_IMAGE:$CI_COMMIT_TAG\nAutomated release (maintainer to fill in details)'
+    assets:
+      links:
+        - name: 'OpenAPI spec (oas.json)'
+          url: '${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/oas.json?job=release:generate:oas'
+        - name: 'Docker image (Docker Hub)'
+          url: 'https://hub.docker.com/r/${DOCKERHUB_USER}/mcmanager/tags?name=${CI_COMMIT_TAG}'
+          link_type: image

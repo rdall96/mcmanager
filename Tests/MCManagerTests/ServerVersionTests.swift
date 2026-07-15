@@ -30,7 +30,7 @@ final class ServerVersionTests: XCTestCase {
     
     func testVersionDecoding() throws {
         Self.versions.forEach {
-            let version = MCServer.Version(string: $0)
+            let version = MinecraftServer.Version(string: $0)
             if version == nil {
                 XCTFail("Exepcted valid version from \($0)")
             }
@@ -40,7 +40,7 @@ final class ServerVersionTests: XCTestCase {
     
     func testVersionDecodingInvalid() throws {
         Self.invalidVersions.forEach { version in
-            if MCServer.Version(string: version) != nil {
+            if MinecraftServer.Version(string: version) != nil {
                 XCTFail("Exepcted invalid version from \(version)")
             }
         }

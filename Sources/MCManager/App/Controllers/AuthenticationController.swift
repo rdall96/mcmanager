@@ -1,6 +1,6 @@
 //
 //  AuthenticationController.swift
-//  
+//  MCManager
 //
 //  Created by Ricky Dall'Armellina on 7/14/23.
 //
@@ -12,20 +12,36 @@ struct AuthenticationController: MCManagerAPIRoute, RouteCollection {
     let logger = Logger(label: "mcmanager.auth")
     
     func boot(routes: RoutesBuilder) throws {
-        let auth = routes.grouped("auth")
-        
-        auth
-            .requireUserCredentials()
+        let authRoutes = routes.grouped("auth")
+            .openAPIMetadata(tags: .auth)
+
+        // Login
+        authRoutes.requireUserCredentials()
             .post("login", use: login)
-        
-        auth
-            .requireAuthentication()
+            .openAPIMetadata(
+                summary: "Authenticate a user",
+                request: .userCredentialsRequest,
+                responses: .authenticationSuccessfulResponse, .invalidCredentialsResponse
+            )
+
+        // Logout
+        authRoutes.requireAuthentication()
             .get("logout", use: logout)
-        
-        auth.get("key", use: publicKey)
+            .openAPIMetadata(
+                summary: "Log out the current user",
+                request: .requiresAuthentication,
+                responses: .emptyResponse, .notAuthenticatedResponse
+            )
+
+        // Public key
+        authRoutes.get("key", use: publicKey)
+            .openAPIMetadata(
+                summary: "Fetch the public key used to validate authentication tokens",
+                responses: .publicKeyResponse
+            )
     }
     
-    /// Login request
+    /// Authenticate a user.
     func login(req: Request) async throws -> ClientSession {
         let user = try requireAuthenticated(for: req)
         guard let payload = try SessionToken.token(for: user) else {
@@ -33,10 +49,10 @@ struct AuthenticationController: MCManagerAPIRoute, RouteCollection {
         }
         try await payload.save(on: req.db)
         let token = try req.jwt.sign(payload)
-        return .init(accessToken: token)
+        return ClientSession(accessToken: token)
     }
     
-    /// Logout the current session
+    /// Log out the current user.
     func logout(req: Request) async throws -> HTTPStatus {
         let user = try requireAuthenticated(for: req)
         // delete any existing session for this user
@@ -49,7 +65,7 @@ struct AuthenticationController: MCManagerAPIRoute, RouteCollection {
         return .noContent
     }
     
-    /// Public key to verify token signature
+    /// Fetch the public key used to validate authentication tokens.
     func publicKey(req: Request) async throws -> String {
         do {
             let keyPath = try DirectoryConfiguration.detect().publicKeyPath

@@ -7,11 +7,12 @@
 
 import Fluent
 import Vapor
+import VaporToOpenAPI
 
+@OpenAPIDescriptable
+/// Global application settings.
 final class Settings: Model, Content {
     static let schema = "settings"
-    
-    static let validPortRange: ClosedRange<MCServer.Port> = 1024...65535
 
     enum FieldKeys: FieldKey {
         case serverStatusCacheTTLSeconds = "server_status_cache_ttl_seconds"
@@ -46,7 +47,7 @@ final class Settings: Model, Content {
     var allowedServerPorts: String
     
     @Field(key: FieldKeys.maxRunningServers.rawValue)
-    /// The maximum number of concurrently running servers
+    /// The maximum number of concurrently running servers.
     var maxRunningServers: UInt
     
     init() {}
@@ -64,28 +65,30 @@ final class Settings: Model, Content {
         self.maxRunningServers = maxRunningServers
     }
     
-    var allowedServerPortsData: Set<MCServer.Port> {
-        var ports = Set<MCServer.Port>()
+    var allowedServerPortsData: Set<MinecraftServer.Port> {
+        var ports = Set<MinecraftServer.Port>()
         for portValue in allowedServerPorts.split(separator: ",") {
             // if the portValue contains a `-` then it's a range, otherwise it's a single value
             if portValue.contains("-") {
                 let portRangeValues = portValue.split(separator: "-", maxSplits: 1)
-                guard let lowerBound = MCServer.Port(portRangeValues[0]),
-                      let upperBound = MCServer.Port(portRangeValues[1])
+                guard let lowerBound = MinecraftServer.Port(String(portRangeValues[0])),
+                      let upperBound = MinecraftServer.Port(String(portRangeValues[1])),
+                      lowerBound <= upperBound
                 else { continue }
-                ports.formUnion(lowerBound...upperBound)
+                let portRange: ClosedRange<MinecraftServer.Port> = lowerBound...upperBound
+                ports.formUnion(portRange)
             }
             else {
-                guard let port = MCServer.Port(portValue) else { continue }
+                guard let port = MinecraftServer.Port(String(portValue)) else { continue }
                 ports.insert(port)
             }
         }
-        return ports.intersection(Self.validPortRange)
+        return ports.intersection(MinecraftServer.Port.validPortRange)
     }
     
-    // MARK: - Codable
+    // MARK: Codable
     
-    private enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey {
         case serverStatusCacheTTLSeconds
         case serverSupportCacheTTLSeconds
         case allowedServerPorts

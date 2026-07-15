@@ -13,7 +13,7 @@ extension DirectoryConfiguration {
     private var workingDirectoryURL: URL {
         URL(fileURLWithPath: workingDirectory)
     }
-    
+
     /// Data diredtory to store all persistent pp data
     var dataDirectory: URL {
         get throws {

@@ -6,9 +6,13 @@
 //
 
 import Foundation
+import Vapor
+import VaporToOpenAPI
 
-extension MCServer {
-    enum Status: String, Codable, CaseIterable {
+extension MinecraftServer {
+    @OpenAPIDescriptable
+    /// Minecraft server runtime status.
+    enum Status: String, CaseIterable, Content {
         case unknown
         case stopped
         case starting

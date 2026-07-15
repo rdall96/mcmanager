@@ -7,9 +7,12 @@
 
 import Foundation
 import Vapor
+import VaporToOpenAPI
 
-extension MCServer {
-    enum ServerType: String, Codable, CaseIterable, Content {
+extension MinecraftServer {
+    @OpenAPIDescriptable
+    /// Minecraft server type.
+    enum ServerType: String, CaseIterable, Content {
         case java
         case javaFabric = "java_fabric"
         case javaForge = "java_forge"

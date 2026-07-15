@@ -7,13 +7,20 @@
 
 import Foundation
 import Vapor
+import VaporToOpenAPI
 
-extension MCServer {
+extension MinecraftServer {
+    @OpenAPIDescriptable
+    /// Minecraft server information.
     struct Info: Content {
-        /// Current status of the server
+
+        /// Current status of the server.
         let status: Status
-        /// If true, this server needs a restart in order to apply all updated configurations
+
+        /// Flag indicating whether the server is pending a restart.
+        /// If true, this server needs a restart in order to apply all updated configurations.
         let needsRestart: Bool
+
         /// List of currently active players on the server
 //        let onlinePlayers: [String]
         
@@ -27,9 +34,9 @@ extension MCServer {
 //            self.onlinePlayers = onlinePlayers
         }
         
-        // MARK: - Codable
+        // MARK: Codable
         
-        private enum CodingKeys: String, CodingKey {
+        enum CodingKeys: String, CodingKey {
             case status
             case needsRestart
 //            case onlinePlayers
