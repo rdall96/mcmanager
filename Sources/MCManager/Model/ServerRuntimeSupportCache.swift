@@ -26,14 +26,14 @@ final class ServerRuntimeSupportCache: Model, Content {
     var createdAt: Date
 
     @Field(key: FieldKeys.serverType.rawValue)
-    var serverType: MCServer.ServerType
+    var serverType: MinecraftServer.ServerType
 
     @Field(key: FieldKeys.versions.rawValue)
     var versions: [String]
 
     init() {}
 
-    init(with runtimeSupport: MCServer.RuntimeSupport) {
+    init(with runtimeSupport: MinecraftServer.RuntimeSupport) {
         id = UUID()
         createdAt = .now
         serverType = runtimeSupport.type
@@ -41,7 +41,7 @@ final class ServerRuntimeSupportCache: Model, Content {
     }
 }
 
-extension MCServer.RuntimeSupport {
+extension MinecraftServer.RuntimeSupport {
     init(with cache: ServerRuntimeSupportCache) {
         self.init(type: cache.serverType, versions: cache.versions)
     }

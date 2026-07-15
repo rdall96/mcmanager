@@ -86,9 +86,9 @@ extension Request {
                 // user has no role, use default permissions
                 return defaultPermissions
             }
-            guard let permissions = try await Permissions.find(role.$_permissions.id, on: db) else {
+            guard let permissions = try await Permissions.find(role.$permissions.id, on: db) else {
                 // role has no permissions linked with it (error: invalid role, DB corrupted or out of sync)
-                throw RoleError.missingPermissions(role)
+                throw RoleError.missingPermissions
             }
             return permissions
         }

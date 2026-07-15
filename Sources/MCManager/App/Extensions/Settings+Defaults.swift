@@ -10,7 +10,7 @@ extension Settings {
         .init(
             serverStatusCacheTTLSeconds: 5,
             serverSupportCacheTTLSeconds: 3600, // 1 hour
-            allowedServerPorts: "\(Settings.validPortRange.lowerBound)-\(Settings.validPortRange.upperBound)",
+            allowedServerPorts: "\(MinecraftServer.Port.validPortRange.lowerBound)-\(MinecraftServer.Port.validPortRange.upperBound)",
             maxRunningServers: 10
         )
     }

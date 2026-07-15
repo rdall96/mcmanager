@@ -13,12 +13,12 @@ import Network
 #endif // canImport(Network)
 
 // FIXME: This does not work on linux because the `Network` library isn't available
-final actor MCServerQuery {
+final actor MinecraftServerQuery {
     
     private let query: UDPSession
     let sessionId: Int32
     
-    init(port: MCServer.Port, timeout: Int = 30) {
+    init(port: MinecraftServer.Port, timeout: Int = 30) {
         query = .init(host: .localhost, port: port, timeout: timeout)
         sessionId = Int32.random() & 0x0F0F0F0F
     }
@@ -77,7 +77,7 @@ final actor MCServerQuery {
     }
 }
 
-extension MCServerQuery {
+extension MinecraftServerQuery {
     enum QueryError: Error {
         case handshakeFailed
         case statsRequestFailed
@@ -137,11 +137,11 @@ fileprivate final actor UDPSession {
     
     let timeout: Int
     
-    init(host: Address, port: MCServer.Port, timeout: Int = 30) {
+    init(host: Address, port: MinecraftServer.Port, timeout: Int = 30) {
 #if canImport(Network)
         connection = NWConnection(
             host: .init(host.rawValue),
-            port: .init(integerLiteral: port),
+            port: .init(integerLiteral: port.rawValue),
             using: .udp
         )
 #endif // canImport(Network)

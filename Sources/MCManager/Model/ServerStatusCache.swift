@@ -36,8 +36,8 @@ final class ServerStatusCache: Model, Content {
     init(
         id: UUID,
         createdAt: Date = .now,
-        info: MCServer.Info,
-        stats: MCServer.Stats
+        info: MinecraftServer.Info,
+        stats: MinecraftServer.Stats
     ) {
         self.id = id
         self.createdAt = createdAt
@@ -46,14 +46,14 @@ final class ServerStatusCache: Model, Content {
     }
     
     /// Cached `Server.Info` value
-    var info: MCServer.Info? {
+    var info: MinecraftServer.Info? {
         guard let infoData else { return nil }
-        return try? JSONDecoder().decode(MCServer.Info.self, from: infoData)
+        return try? JSONDecoder().decode(MinecraftServer.Info.self, from: infoData)
     }
     
     /// Cached `Server.Metrics` value
-    var stats: MCServer.Stats? {
+    var stats: MinecraftServer.Stats? {
         guard let statsData else { return nil }
-        return try? JSONDecoder().decode(MCServer.Stats.self, from: statsData)
+        return try? JSONDecoder().decode(MinecraftServer.Stats.self, from: statsData)
     }
 }

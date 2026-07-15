@@ -10,7 +10,7 @@ import XCTest
 
 final class OrchestraTests: XCTestCase {
     
-    var orchestra: MCServerManager!
+    var orchestra: MinecraftServerManager!
     
     override func setUp() async throws {
         orchestra = try .init(serversRoot: FileManager.default.temporaryDirectory)
@@ -23,7 +23,7 @@ final class OrchestraTests: XCTestCase {
     // MARK: - Helpers
     
     @discardableResult
-    private func addServer() async throws -> MCServer {
+    private func addServer() async throws -> MinecraftServer {
         let server = TestData.createServer()
         try await orchestra.add(server: server)
         return server
@@ -61,7 +61,7 @@ final class OrchestraTests: XCTestCase {
             _ = try await orchestra.info(for: server.id!)
             XCTFail("Expected failure to get info after deleting server")
         }
-        catch MCServerError.invalidServerId {}
+        catch MinecraftServerError.invalidServerId {}
         catch {
             XCTFail("Unexpected error: \(error)")
         }
@@ -72,7 +72,7 @@ final class OrchestraTests: XCTestCase {
             _ = try await orchestra.info(for: UUID())
             XCTFail("Expected failure when deleting invalid server")
         }
-        catch MCServerError.invalidServerId {}
+        catch MinecraftServerError.invalidServerId {}
         catch {
             XCTFail("Unexpected error: \(error)")
         }
@@ -80,7 +80,7 @@ final class OrchestraTests: XCTestCase {
     
     func testHasSupportedRuntimes() async throws {
         let runtimeSupport = try await orchestra.allSupportedRuntimes
-        for serverType in MCServer.ServerType.allCases {
+        for serverType in MinecraftServer.ServerType.allCases {
             XCTAssertNotNil(runtimeSupport.first(where: { $0.type == serverType }))
         }
     }
@@ -96,7 +96,7 @@ final class OrchestraTests: XCTestCase {
             _ = try await orchestra.info(for: UUID())
             XCTFail("Expected failure when getting info for non-existing server")
         }
-        catch MCServerError.invalidServerId {}
+        catch MinecraftServerError.invalidServerId {}
         catch {
             XCTFail("Unexpected error: \(error)")
         }

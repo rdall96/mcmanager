@@ -38,7 +38,7 @@ private enum PropertyValue: Decodable {
     }
 }
 
-extension MCServer.Properties {
+extension MinecraftServer.Properties {
     /// An environment variable representation of the server properties as key=value pairs.
     func generateEnvironmentVariables() throws -> [Docker.ContainerSpec.EnvironmentVariable] {
         // Encode the data into JSON, then decode it into a dictionary.

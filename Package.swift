@@ -22,6 +22,8 @@ let package = Package(
         .package(url: "https://github.com/qiuzhifei/swift-commands", from: "0.6.0"),
         // Zip
         .package(url: "https://github.com/marmelroy/Zip.git", from: "2.0.0"),
+        // OAS generation
+        .package(url: "https://github.com/dankinsoid/VaporToOpenAPI.git", from: "4.9.2"),
     ],
     targets: [
         .executableTarget(
@@ -35,6 +37,7 @@ let package = Package(
                 .product(name: "JWT", package: "jwt"),
                 .product(name: "Vapor", package: "vapor"),
                 .product(name: "Zip", package: "Zip"),
+                .product(name: "VaporToOpenAPI", package: "VaporToOpenAPI"),
             ],
             swiftSettings: [
                 // Enable better optimizations when building in Release configuration. Despite the use of

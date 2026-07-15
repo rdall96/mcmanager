@@ -55,7 +55,10 @@ RUN find -L \
 
 # Copy any resources from the public directory and views directory if the directories exist
 # Ensure that by default, neither the directory nor any of its contents are writable.
-RUN [ -d /build/Public ] && { mv /build/Public ./Public && chmod -R a-w ./Public; } || true
+# The Public directory (e.g. debug-only Swagger UI assets) is only needed for debug builds.
+RUN if [ "$BUILD_TYPE" = "debug" ] && [ -d /build/Public ]; then \
+      mv /build/Public ./Public && chmod -R a-w ./Public; \
+    fi
 RUN [ -d /build/Resources ] && { mv /build/Resources ./Resources && chmod -R a-w ./Resources; } || true
 
 # ================================

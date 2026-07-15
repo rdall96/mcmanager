@@ -1,4 +1,5 @@
 {
+  "originHash" : "4cc35c1ce807d39d92fe9d28c0cb290c0f3aeb9ec36c95f1c6299735d03a531d",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -244,12 +245,39 @@
       }
     },
     {
+      "identity" : "swift-syntax",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/swiftlang/swift-syntax.git",
+      "state" : {
+        "revision" : "79e4b74a295b6eb74a8b585e3a39d29e70c1dbd1",
+        "version" : "603.0.2"
+      }
+    },
+    {
+      "identity" : "swiftopenapi",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/dankinsoid/SwiftOpenAPI.git",
+      "state" : {
+        "revision" : "057aec3909fa14c920fc79aa57f56cffc1b6febf",
+        "version" : "2.26.0"
+      }
+    },
+    {
       "identity" : "vapor",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vapor/vapor.git",
       "state" : {
         "revision" : "1f2b44b1739ff5cdec6c6dfec40020f5d4b2a813",
         "version" : "4.83.2"
+      }
+    },
+    {
+      "identity" : "vaportoopenapi",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/dankinsoid/VaporToOpenAPI.git",
+      "state" : {
+        "revision" : "a555ef29461c7849467368b6c43d4654a0d0e56f",
+        "version" : "4.9.2"
       }
     },
     {
@@ -271,5 +299,5 @@
       }
     }
   ],
-  "version" : 2
+  "version" : 3
 }

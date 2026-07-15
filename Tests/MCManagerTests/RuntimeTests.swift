@@ -18,8 +18,8 @@ final class RuntimeTests: XCTestCase {
         testPath = FileManager.default.temporaryDirectory
     }
     
-    private func createRuntime(with server: MCServer) async throws -> ServerRuntime {
-        try await ServerRuntime(info: server, rootPath: testPath)
+    private func createRuntime(with server: MinecraftServer) async throws -> MinecraftServerRuntime {
+        try await MinecraftServerRuntime(info: server, rootPath: testPath)
     }
     
     // MARK: - Test cases
@@ -37,12 +37,12 @@ final class RuntimeTests: XCTestCase {
         let server = TestData.createServer()
         let configPath = testPath
             .appendingPathComponent(server.id!.pathSafeString)
-            .appendingPathComponent(ServerRuntime.Defaults.configFileName)
+            .appendingPathComponent(MinecraftServerRuntime.Defaults.configFileName)
         XCTAssertFalse(FileManager.default.fileExists(atPath: configPath.path))
         _ = try await createRuntime(with: server)
         XCTAssertTrue(FileManager.default.fileExists(atPath: configPath.path))
         let data = try Data(contentsOf: configPath)
-        let config: [MCServer.Config] = try JSONDecoder().decode([MCServer.Config].self, from: data)
+        let config: [MinecraftServer.Config] = try JSONDecoder().decode([MinecraftServer.Config].self, from: data)
         XCTAssertGreaterThan(config.count, 0)
         XCTAssertNotNil(config.first(where: { $0.id == "GAMEMODE" }))
     }
@@ -50,7 +50,7 @@ final class RuntimeTests: XCTestCase {
     func testUpdateRuntimeHappyPath() async throws {
         let server = TestData.createServer()
         let runtime = try await createRuntime(with: server)
-        server.port = ServerRuntime.Defaults.minecraftServerPort
+        server.port = MinecraftServerRuntime.Defaults.minecraftServerPort
         server.version = TestData.versions.randomElement()!
         try await runtime.update(server)
     }
@@ -87,7 +87,7 @@ final class RuntimeTests: XCTestCase {
         XCTAssertNotNil(icon)
         let iconpath = testPath
             .appendingPathComponent(server.id!.pathSafeString)
-            .appendingPathComponent(ServerRuntime.Defaults.iconFileName)
+            .appendingPathComponent(MinecraftServerRuntime.Defaults.iconFileName)
         XCTAssertTrue(FileManager.default.fileExists(atPath: iconpath.path))
     }
     
@@ -95,10 +95,10 @@ final class RuntimeTests: XCTestCase {
         let server = TestData.createServer()
         let runtime = try await createRuntime(with: server)
         do {
-            try await runtime.updateIcon(MCServer.Icon(base64: "definitely_not_base64"))
+            try await runtime.updateIcon(MinecraftServer.Icon(base64: "definitely_not_base64"))
             XCTFail("Expected failure when updating icon with invalid data")
         }
-        catch MCServerError.invalidIconData {}
+        catch MinecraftServerError.invalidIconData {}
         catch {
             XCTFail("Unexpected error: \(error)")
         }
@@ -114,7 +114,7 @@ final class RuntimeTests: XCTestCase {
         XCTAssertNotNil(icon)
         let iconpath = testPath
             .appendingPathComponent(server.id!.pathSafeString)
-            .appendingPathComponent(ServerRuntime.Defaults.iconFileName)
+            .appendingPathComponent(MinecraftServerRuntime.Defaults.iconFileName)
         XCTAssertTrue(FileManager.default.fileExists(atPath: iconpath.path))
         await runtime.removeIcon()
         XCTAssertFalse(FileManager.default.fileExists(atPath: iconpath.path))
@@ -129,7 +129,7 @@ final class RuntimeTests: XCTestCase {
             config.first(where: { $0.id == "PVP" })?.value.description == "true"
         )
         try await runtime.updateConfig(
-            [MCServer.Config("PVP", value: .flag(false))]
+            [MinecraftServer.Config("PVP", value: .flag(false))]
         )
         config = await runtime.config
         XCTAssert(
@@ -141,11 +141,11 @@ final class RuntimeTests: XCTestCase {
         let runtime = try await createRuntime(with: TestData.createServer())
         do {
             try await runtime.updateConfig(
-                [MCServer.Config("INVICIBLE", value: .flag(true))]
+                [MinecraftServer.Config("INVICIBLE", value: .flag(true))]
             )
             XCTFail("Expected failure when updating server config with unknwown key")
         }
-        catch MCServerError.invalidServerProperty("INVICIBLE") {}
+        catch MinecraftServerError.invalidServerProperty("INVICIBLE") {}
         catch {
             XCTFail("Unexpected error: \(error)")
         }
@@ -201,6 +201,6 @@ final class RuntimeTests: XCTestCase {
 }
 
 // MARK: - Test extensions
-extension ServerRuntime {
+extension MinecraftServerRuntime {
     var getProcess: Docker.Container { process }
 }

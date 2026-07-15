@@ -16,14 +16,60 @@ struct UserController: MCManagerAPIRoute, RouteCollection {
             .requireAuthentication()
             .apiVersion(.v1)
             .grouped("users")
+            .openAPIMetadata(tags: .users, requiresAuthentication: true)
+
+        // Fetch all users
         users.get(use: all)
+            .openAPIMetadata(
+                summary: "Fetch all users",
+                permissions: Permissions(users: .readUsers),
+                responses: .usersResponse
+            )
+
+        // Fetch current user
         users.get("profile", use: me)
+            .openAPIMetadata(
+                summary: "Fetch the current user",
+                responses: .userResponse
+            )
+
+        // Create a new user
         users.post(use: create)
-        users.group(":userID") { user in
-            user.get(use: self.user(req:))
-            user.put(use: update)
-            user.delete(use: delete)
-        }
+            .openAPIMetadata(
+                summary: "Create a new user",
+                request: .userRequest,
+                permissions: Permissions(users: .createUsers),
+                responses: .userResponse, .adminRequiredResponse, .duplicateUserResponse
+            )
+
+        // User routes
+        let user = users.grouped(":userID")
+            .openAPIResponse(.userNotFoundResponse)
+
+        // Fetch a user
+        user.get(use: self.user(req:))
+            .openAPIMetadata(
+                summary: "Fetch a user",
+                permissions: Permissions(users: .readUsers),
+                responses: .userResponse
+            )
+
+        // Edit a user
+        user.put(use: update)
+            .openAPIMetadata(
+                summary: "Edit a user",
+                request: .userRequest,
+                permissions: Permissions(users: .editUsers),
+                responses: .userResponse, .adminRequiredResponse, .duplicateUserResponse
+            )
+
+        // Delete a user
+        user.delete(use: delete)
+            .openAPIMetadata(
+                summary: "Delete a user",
+                permissions: Permissions(users: .deleteUsers),
+                responses: .success("User deleted"), .cantDeleteAdminResponse
+            )
     }
     
     // MARK: - Routes
@@ -41,39 +87,33 @@ struct UserController: MCManagerAPIRoute, RouteCollection {
         guard try await req.userHasPermissions(for: .createUsers) else {
             throw UserError.unauthorized
         }
-        let userRequest = try req.content.decode(User.self)
+        let createRequest = try req.content.decode(UserRequest.self)
 
         // Only admins can create other admins
-        if userRequest.isAdmin, !(try req.currentUser.isAdmin) {
+        if createRequest.isAdmin, !(try req.currentUser.isAdmin) {
             throw UserError.adminRequired
         }
 
         // Check if a user with this username already exists
         let existingUser = try await User.query(on: req.db)
-            .filter(\.$username, .equal, userRequest.username)
+            .filter(\.$username, .equal, createRequest.username)
             .first()
         guard existingUser == nil else {
-            logger.error("Attempted to create user with duplicated username: \(userRequest.username)")
+            logger.error("Attempted to create user with duplicated username: \(createRequest.username)")
             throw UserError.alreadyExists
         }
 
         // This new user will now need its password encrypted before saving
-        let newUser = try User(
-            username: userRequest.username,
-            password: userRequest.password,
-            isAdmin: userRequest.isAdmin,
-            roleID: userRequest.$role.id
-        )
+        let newUser = try User(with: createRequest)
         do {
             try await newUser.save(on: req.db)
         }
         catch {
             logger.critical("Faield to create new user: \(error)")
-            throw UserError.unknown
+            throw Abort(.internalServerError)
         }
         return newUser
     }
-    
     
     /// Get info for a specific user
     func user(req: Request) async throws -> User {
@@ -95,7 +135,7 @@ struct UserController: MCManagerAPIRoute, RouteCollection {
         // Gather necessary data and decode request
         let user = try await req.user
         let hasPermissions = try await req.userHasPermissions(for: .editUsers)
-        let userRequest = try req.content.decode(User.self)
+        let editRequest = try req.content.decode(UserRequest.self)
         guard try user.isCurrentUser(for: req) || hasPermissions else {
             throw UserError.unauthorized
         }
@@ -105,54 +145,31 @@ struct UserController: MCManagerAPIRoute, RouteCollection {
         if user.isAdmin, !(try user.isCurrentUser(for: req)), !(try req.currentUser.isSuperAdmin) {
             throw UserError.unauthorized
         }
-        // * a user can't change it's own role (regardless of permissions)
-        if try user.isCurrentUser(for: req), user.$role.id != userRequest.$role.id {
-            throw UserError.unauthorized
-        }
         // * only the super admin can grant/revoke admin access
-        if user.isAdmin != userRequest.isAdmin, !(try req.currentUser.isSuperAdmin) {
+        if user.isAdmin != editRequest.isAdmin, !(try req.currentUser.isSuperAdmin) {
             throw UserError.adminRequired
         }
-        // * super admin access cannot be granted to any user, only the default bootstrapped super admin can exist
-        if !user.isSuperAdmin, userRequest.isSuperAdmin {
-            throw UserError.unauthorized
+        // * the requested role must exist
+        if user.$role.id != editRequest.role, let newRoleID = editRequest.role,
+           try await Role.find(newRoleID, on: req.db) == nil {
+            throw UserError.invalidRole
         }
-        // * empty username
-        if userRequest.username.isEmpty {
-            throw UserError.missingUsername
+        // * a user can't change it's own role (regardless of permissions)
+        if try user.isCurrentUser(for: req), user.$role.id != editRequest.role {
+            throw UserError.unauthorized
         }
         // * duplicate username
         let existingUserWithRequestedName = try await User.query(on: req.db)
-            .filter(\.$username, .equal, userRequest.username)
+            .filter(\.$username, .equal, editRequest.username)
             .filter(\.$id, .notEqual, user.requireID())
             .first()
         guard existingUserWithRequestedName == nil else {
-            logger.error("Attempted to update user with duplicated username: \(userRequest.username)")
+            logger.error("Attempted to update user with duplicated username: \(editRequest.username)")
             throw UserError.alreadyExists
         }
 
-        // Update the user:
-        // * username
-        user.username = userRequest.username
-        // * password: empty means don't update
-        if !userRequest.password.isEmpty {
-            try user.updatePassword(userRequest.password)
-        }
-        // * role - admins don't have a role, ignore any attempts to change it
-        if !user.isAdmin {
-            user.$role.id = userRequest.$role.id
-        }
-        // * admin privileges - can never be changed for the super admin account
-        if !user.isSuperAdmin {
-            if userRequest.isAdmin {
-                user.grantAdmin()
-            }
-            else {
-                user.revokeAdmin()
-            }
-        }
-        // * last updated timestamp
-        user.updatedAt = .now
+        // Update the user
+        try user.update(with: editRequest)
 
         // Save the user and return the updated model
         try await user.save(on: req.db)
@@ -178,7 +195,7 @@ struct UserController: MCManagerAPIRoute, RouteCollection {
         
         try await user.delete(on: req.db)
         
-        return .noContent
+        return .ok
     }
 }
 
@@ -192,7 +209,7 @@ fileprivate extension Request {
                 throw UserError.missingID
             }
             guard let uuid = UUID(uuidString: id) else {
-                throw UserError.invalidID(id)
+                throw UserError.invalidID
             }
             return uuid
         }
@@ -203,7 +220,7 @@ fileprivate extension Request {
             let userID = try userID
             let user = try await User.find(userID, on: self.db)
             guard let user else {
-                throw UserError.notFound(userID)
+                throw UserError.notFound
             }
             return user
         }

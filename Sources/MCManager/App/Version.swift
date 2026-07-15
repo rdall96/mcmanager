@@ -5,11 +5,15 @@
 //  Created by Ricky Dall'Armellina on 7/14/23.
 //
 
-enum APIVersion: String {
+import VaporToOpenAPI
+
+/// MCManager API version.
+enum APIVersion: String, CaseIterable {
     case v1
     case v2
 }
 
+/// MCManager application version.
 struct AppVersion {
     let major: UInt
     let minor: UInt
@@ -61,5 +65,19 @@ extension AppVersion: Codable {
     func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(description)
+    }
+}
+
+// MARK: - Open API Spec
+
+extension APIVersion: OpenAPIDescriptable {
+    static var openAPIDescription: OpenAPIDescriptionType? {
+        "MCManager API version."
+    }
+}
+
+extension AppVersion: OpenAPIDescriptable {
+    static var openAPIDescription: OpenAPIDescriptionType? {
+        "MCManager application version."
     }
 }

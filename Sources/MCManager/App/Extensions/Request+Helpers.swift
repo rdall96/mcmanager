@@ -10,8 +10,8 @@ import Vapor
 
 extension Client {
     /// Lookup Minecraft player information via: GET - https://api.mojang.com/users/profiles/minecraft/<playerName>
-    func minecraftPlayerInfo(for name: String) async throws -> MCPlayerInfo {
+    func minecraftPlayerInfo(for name: String) async throws -> MinecraftPlayerInfo {
         let response = try await self.get("https://api.mojang.com/users/profiles/minecraft/\(name)")
-        return try response.content.decode(MCPlayerInfo.self)
+        return try response.content.decode(MinecraftPlayerInfo.self)
     }
 }

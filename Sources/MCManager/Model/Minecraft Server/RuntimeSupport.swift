@@ -7,14 +7,17 @@
 
 import Foundation
 import Vapor
+import VaporToOpenAPI
 
-extension MCServer {
-    /**
-     Data regarding the types and game versions that can be used to create a server.
-     This should be used a reference before calling `createServer`.
-     */
+extension MinecraftServer {
+    @OpenAPIDescriptable
+    /// Data regarding the types and game versions that can be used to create a server.
+    /// This should be used a reference before calling `createServer`.
     struct RuntimeSupport: Content {
+
+        /// Type of supported Minecraft server.
         let type: ServerType
+        /// List of available Minecraft game versions, sorted newest first.
         let versions: [Version]
         
         init(type: ServerType, versions: [Version]) {
@@ -27,6 +30,13 @@ extension MCServer {
                 .compactMap { Version(string: $0) }
                 .sorted(by: >)
             self.init(type: type, versions: versions)
+        }
+
+        // MARK: Codable
+
+        enum CodingKeys: String, CodingKey {
+            case type
+            case versions
         }
     }
 }

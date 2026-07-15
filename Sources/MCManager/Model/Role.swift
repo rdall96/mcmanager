@@ -8,7 +8,9 @@
 import Foundation
 import Fluent
 import Vapor
+import VaporToOpenAPI
 
+/// User role information.
 final class Role: Model, Content {
     static let schema = "roles"
     
@@ -19,71 +21,64 @@ final class Role: Model, Content {
         case updatedAt = "updated_at"
     }
     
-    // MARK: - Members
+    // MARK: Members
     
     @ID(key: .id)
+    /// Role ID.
     var id: UUID?
     
     @Field(key: FieldKeys.name.rawValue)
+    /// Role name.
     var name: String
 
-    // There's 2 permissions members on purpose:
-    // * `_permissions` is used as a reference to the permissions entity in the respective DB table
-    // * `permissions` is used as a local storage for the permission values: it get's encoded in responses and allows for easy read/write throughout the app
     @Parent(key: FieldKeys.permissionsID.rawValue)
-    private(set) var _permissions: Permissions
-    var permissions: Permissions?
+    /// Set of permissions granted to users with the role.
+    var permissions: Permissions
     
     @Field(key: FieldKeys.createdAt.rawValue)
+    /// Date when the role was created.
     var createdAt: Date
     
     @Field(key: FieldKeys.updatedAt.rawValue)
+    /// Date when the role was last updated.
     var updatedAt: Date
     
-    // MARK: - Initializers
+    // MARK: Initializers
     
     init() {}
     
     init(name: String, permissions: Permissions) throws {
+        // name can't be empty
+        if name.isEmpty {
+            throw RoleError.missingName
+        }
+
         self.id = UUID()
         self.name = name
-        self.$_permissions.id = try permissions.requireID()
-        self.permissions = permissions
+        self.$permissions.id = try permissions.requireID()
         self.createdAt = .now
         self.updatedAt = .now
     }
     
-    // MARK: - Methods
+    // MARK: Codable
     
-    func update(with roleRequest: Role) {
-        name = roleRequest.name
-        updatedAt = .now
-    }
-    
-    // MARK: - Codable
-    
-    private enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey {
         case id
         case name
         case permissions
         case createdAt
         case updatedAt
     }
-    
-    convenience init(from decoder: any Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        try self.init(
-            name: try container.decode(String.self, forKey: .name),
-            permissions: try container.decode(Permissions.self, forKey: .permissions)
-        )
-    }
-    
-    func encode(to encoder: any Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(try requireID(), forKey: .id)
-        try container.encode(name, forKey: .name)
-        try container.encode(permissions, forKey: .permissions)
-        try container.encode(createdAt, forKey: .createdAt)
-        try container.encode(updatedAt, forKey: .updatedAt)
+}
+
+// MARK: - Open API Spec
+extension Role: OpenAPIDescriptable {
+    static var openAPIDescription: OpenAPIDescriptionType? {
+        OpenAPIDescription<CodingKeys>("User role information.")
+            .add(for: .id, "Role ID.")
+            .add(for: .name, "Role name.")
+            .add(for: .permissions, "Set of permissions granted to users with the role.")
+            .add(for: .createdAt, "Date when the role was created in ISO 8601 format.")
+            .add(for: .updatedAt, "Date when the role was last updated in ISO 8601 format.")
     }
 }

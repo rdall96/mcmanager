@@ -20,8 +20,23 @@ struct SettingsController: MCManagerAPIRoute, RouteCollection {
             .requireAuthentication()
             .apiVersion(.v1)
             .grouped("settings")
+            .openAPIMetadata(tags: .settings, requiresAuthentication: true)
+
+        // Fetch settings
         settings.get(use: `get`)
+            .openAPIMetadata(
+                summary: "Fetch application settings",
+                responses: .applicationSettingsResponse
+            )
+
+        // Edit settings
         settings.put(use: update)
+            .openAPIMetadata(
+                summary: "Edit application settings",
+                request: .updateSettingsRequest,
+                permissions: Permissions(application: .editSettings),
+                responses: .success("Settings updated")
+            )
     }
     
     // MARK: - Routes

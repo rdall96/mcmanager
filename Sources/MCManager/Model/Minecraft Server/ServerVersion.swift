@@ -7,8 +7,10 @@
 
 import Foundation
 import Vapor
+import VaporToOpenAPI
 
-extension MCServer {
+extension MinecraftServer {
+    /// Minecraft game version.
     struct Version: Content {
         let major: UInt
         let minor: UInt
@@ -38,14 +40,15 @@ extension MCServer {
             return text
         }
         
-        static var none: MCServer.Version {
-            MCServer.Version(major: 0, minor: 0)
+        static var none: MinecraftServer.Version {
+            MinecraftServer.Version(major: 0, minor: 0)
         }
     }
 }
 
-extension MCServer.Version: Equatable, Comparable {
-    static func < (lhs: MCServer.Version, rhs: MCServer.Version) -> Bool {
+// MARK: - Comparable
+extension MinecraftServer.Version: Equatable, Comparable {
+    static func < (lhs: MinecraftServer.Version, rhs: MinecraftServer.Version) -> Bool {
         // Minecraft 1.21.x was the last game version to follow the long standing 1.x.x format.
         // In 2026 the game switched to using the year as the major version (i.e.: 26.1, 26.2, etc...)
         guard lhs.major == rhs.major else {
@@ -71,8 +74,7 @@ extension MCServer.Version: Equatable, Comparable {
 }
 
 // MARK: - Codable
-
-extension MCServer.Version: Codable {
+extension MinecraftServer.Version: Codable {
     
     init?(string: String) {
         // the version could be:
@@ -132,7 +134,7 @@ extension MCServer.Version: Codable {
     init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
         let text = try container.decode(String.self)
-        if let version = MCServer.Version(string: text) {
+        if let version = MinecraftServer.Version(string: text) {
             self = version
         }
         else {
@@ -143,5 +145,12 @@ extension MCServer.Version: Codable {
     func encode(to encoder: Encoder) throws {
         var contaier = encoder.singleValueContainer()
         try contaier.encode(description)
+    }
+}
+
+// MARK: - Open API Spec
+extension MinecraftServer.Version: OpenAPIDescriptable {
+    static var openAPIDescription: OpenAPIDescriptionType? {
+        "Minecraft game version."
     }
 }
