@@ -1,9 +1,15 @@
+# ---------------------------------
+# MCManager GitLab CI configuration
+# ---------------------------------
+
+# CI stages
 stages:
   - build
   - test
   - release
 
 
+# Shared variables
 variables:
   # Commit tags regex to determine what pipeline to run
   RELEASE_TAG: '/^\d.\d.\d$/'
@@ -21,6 +27,7 @@ variables:
   DOCKER_HOST: "tcp://docker:2376"
   DOCKER_TLS_CERTDIR: "/certs"
 
+
 # Source paths that should trigger a dev build/test when changed
 .source-changes: &source-changes
   - Dockerfile
@@ -29,7 +36,9 @@ variables:
   - Package.*
 
 
-# Manual build - On custom build tags (for testing purposes)
+# Job: Manual Custom-Tag Build
+# Purpose: Build and push a custom-tagged image to the private registry, for ad-hoc testing.
+# Trigger: manual, when $CUSTOM_TAG is set.
 manual:build:custom-tag:
   stage: build
   tags:
@@ -50,7 +59,9 @@ manual:build:custom-tag:
       when: manual
 
 
-# Development build - In merge requests
+# Job: Development Build
+# Purpose: Compile a debug Swift binary and cache it as an artifact for dev:test:oas.
+# Trigger: every merge request; pushes to main when source file changes are detected.
 dev:build:
   stage: build
   tags:
@@ -79,7 +90,10 @@ dev:build:
       when: always
 
 
-# Development test - Ensure the OAS file is valid and export it
+# Job: Development OAS Test
+# Purpose: Validate the generated OpenAPI spec (oas.json) using the binary built by dev:build.
+# Trigger: same conditions as dev:build (every merge request, or pushes to main with source changes).
+# Depends on: dev:build (needs the binary artifact)
 dev:test:oas:
   stage: test
   tags:
@@ -114,7 +128,9 @@ dev:test:oas:
       when: always
 
 
-# Development build - Create a dev image and upload it to the registry
+# Job: Development Registry Upload
+# Purpose: Build a dev Docker image and push it to the private registry; tags dev-latest when on main.
+# Trigger: manual (optional) on merge requests; automatic on pushes to main.
 dev:upload:registry:
   stage: release
   tags:
@@ -148,7 +164,9 @@ dev:upload:registry:
       allow_failure: true
 
 
-# Release build - New tags matching RELEASE_TAG
+# Job: Release Build
+# Purpose: Build the release image and push it to the private registry under the release tag.
+# Trigger: pushes of a release tag (e.g. 1.2.3).
 release:build:
   stage: build
   tags:
@@ -168,7 +186,9 @@ release:build:
     - if: $CI_COMMIT_TAG =~ $RELEASE_TAG
 
 
-# Release test - Ensure the OAS file is valid and export it
+# Job: Release OAS Generation
+# Purpose: Rebuild the debug binary and validate/export the OpenAPI spec for the release artifacts.
+# Trigger: pushes of a release tag.
 release:generate:oas:
   stage: test
   tags:
@@ -195,7 +215,10 @@ release:generate:oas:
     - if: $CI_COMMIT_TAG =~ $RELEASE_TAG
 
 
-# Release - Upload the image to dockerhub
+# Job: Release Docker Hub Upload
+# Purpose: Retag the release image from the private registry and publish it to Docker Hub.
+# Trigger: pushes of a release tag.
+# Depends on: release:build (implicit - pulls the image it pushed)
 release:upload:dockerhub:
   stage: release
   tags:
@@ -219,7 +242,10 @@ release:upload:dockerhub:
       when: on_success
 
 
-# Release - Create a GitLab release entry
+# Job: Release Publish
+# Purpose: Create the GitLab release entry, linking the Docker Hub image and the OAS artifact.
+# Trigger: pushes of a release tag.
+# Depends on: release:generate:oas, release:upload:dockerhub (implicit - release links reference their outputs)
 release:publish:
   stage: release
   tags:
