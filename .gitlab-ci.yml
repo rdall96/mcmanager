@@ -157,6 +157,7 @@ dev:upload:registry:
   rules:
     # Pushes to the main branch
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $MAIN_BRANCH
+      changes: *source-changes
       when: on_success
     # Manual trigger for merge requests (and optional)
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
