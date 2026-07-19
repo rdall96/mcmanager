@@ -97,7 +97,15 @@ dev:test:oas:
       - oas.json
     expire_in: 1 week
   rules:
-    # Run this with every merge request
+    # Run for pushes to the main branch when source files have changed
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+      changes:
+        - Dockerfile
+        - Sources/**/*
+        - Tests/**/*
+        - Package.*
+      when: always
+    # Run with every merge request
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       when: always
 
@@ -123,11 +131,17 @@ dev:upload:registry:
       --build-arg C_OPTIMIZATION="-Og" \
       --build-arg BUILD_TYPE="debug"
     - docker push $PRIVATE_IMAGE:dev-$CI_COMMIT_SHORT_SHA
-    - docker tag $PRIVATE_IMAGE:dev-$CI_COMMIT_SHORT_SHA $PRIVATE_IMAGE:dev-latest
-    - docker push $PRIVATE_IMAGE:dev-latest
+    # When building off the main branch, also tag and push dev-latest
+    - |
+      if [ "$CI_COMMIT_BRANCH" == "main" ]; then
+        docker tag $PRIVATE_IMAGE:dev-$CI_COMMIT_SHORT_SHA $PRIVATE_IMAGE:dev-latest
+        docker push $PRIVATE_IMAGE:dev-latest
+      fi
   rules:
-    # This job requires manual triggering for merge requests
-    # It's optional: leaving it untriggered (or letting it fail) must not block the MR pipeline/merge
+    # Pushes to the main branch
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+      when: on_success
+    # Manual trigger for merge requests (and optional)
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       when: manual
       allow_failure: true
