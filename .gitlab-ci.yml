@@ -12,7 +12,7 @@ stages:
 # Shared variables
 variables:
   # Commit tags regex to determine what pipeline to run
-  RELEASE_TAG: '/^\d.\d.\d$/'
+  RELEASE_TAG: '/^\d+\.\d+\.\d+$/'
   # Name of the tag when doing manual builds
   CUSTOM_TAG: ''
   # Name of the main/default branch
