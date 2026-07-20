@@ -8,7 +8,7 @@
 import Fluent
 import Vapor
 
-protocol MCManagerAPIRoute {
+protocol MCManagerAPIRoute: Sendable {
     var logger: Logger { get }
 }
 
@@ -48,12 +48,7 @@ struct API: MCManagerAPIRoute, RouteCollection {
         let logger = Logger(label: "mcmanager.api")
         self.logger = logger
         
-        settingsController = SettingsController(
-            logger: logger,
-            onUpdate: { _ in
-                // Do any necessary updates that depend on the settings
-            }
-        )
+        settingsController = SettingsController(logger: logger)
         userController = UserController(logger: logger)
         roleController = RoleController(logger: logger)
         serverController = try await ServerController(

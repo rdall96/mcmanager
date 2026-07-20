@@ -53,7 +53,7 @@ extension AppVersion: Equatable {}
 
 // MARK: - Codable
 extension AppVersion: Codable {
-    init(from decoder: Decoder) throws {
+    init(from decoder: any Decoder) throws {
         let container = try decoder.singleValueContainer()
         let string = try container.decode(String.self)
         guard let version = AppVersion(from: string) else {
@@ -62,7 +62,7 @@ extension AppVersion: Codable {
         self = version
     }
     
-    func encode(to encoder: Encoder) throws {
+    func encode(to encoder: any Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(description)
     }
@@ -71,13 +71,13 @@ extension AppVersion: Codable {
 // MARK: - Open API Spec
 
 extension APIVersion: OpenAPIDescriptable {
-    static var openAPIDescription: OpenAPIDescriptionType? {
+    static var openAPIDescription: (any OpenAPIDescriptionType)? {
         "MCManager API version."
     }
 }
 
 extension AppVersion: OpenAPIDescriptable {
-    static var openAPIDescription: OpenAPIDescriptionType? {
+    static var openAPIDescription: (any OpenAPIDescriptionType)? {
         "MCManager application version."
     }
 }

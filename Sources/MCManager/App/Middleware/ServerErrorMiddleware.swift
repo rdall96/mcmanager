@@ -56,13 +56,13 @@ struct ApplicationErrorMiddleware: Middleware {
             let status: HTTPResponseStatus
             let errorResponse: ErrorResponse
 
-            if let applicationError = error as? ApplicationError {
+            if let applicationError = error as? any ApplicationError {
                 status = applicationError.status
                 errorResponse = ErrorResponse(from: applicationError)
 
                 request.logger.report(error: applicationError)
             }
-            else if let abortError = error as? AbortError {
+            else if let abortError = error as? any AbortError {
                 status = abortError.status
                 errorResponse = ErrorResponse(reason: abortError.reason)
 

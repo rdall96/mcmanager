@@ -11,7 +11,7 @@ import Vapor
 import VaporToOpenAPI
 
 /// Minecraft server metadata.
-final class MinecraftServer: Model, Content {
+final class MinecraftServer: Model, Content, @unchecked Sendable {
 
     static let schema = "servers"
     
@@ -83,7 +83,7 @@ final class MinecraftServer: Model, Content {
         case updatedAt
     }
     
-    init(from decoder: Decoder) throws {
+    init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.id = try container.decode(UUID.self, forKey: .id)
         self.name = try container.decode(String.self, forKey: .name)
@@ -111,7 +111,7 @@ final class MinecraftServer: Model, Content {
 
 // MARK: - Open API Spec
 extension MinecraftServer: OpenAPIDescriptable {
-    static var openAPIDescription: OpenAPIDescriptionType? {
+    static var openAPIDescription: (any OpenAPIDescriptionType)? {
         OpenAPIDescription<CodingKeys>("Minecraft server metadata.")
             .add(for: .id, "Server ID.")
             .add(for: .name, "Server name.")

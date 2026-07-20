@@ -131,7 +131,7 @@ extension MinecraftServer.Version: Codable {
         }
     }
     
-    init(from decoder: Decoder) throws {
+    init(from decoder: any Decoder) throws {
         let container = try decoder.singleValueContainer()
         let text = try container.decode(String.self)
         if let version = MinecraftServer.Version(string: text) {
@@ -142,7 +142,7 @@ extension MinecraftServer.Version: Codable {
         }
     }
     
-    func encode(to encoder: Encoder) throws {
+    func encode(to encoder: any Encoder) throws {
         var contaier = encoder.singleValueContainer()
         try contaier.encode(description)
     }
@@ -150,7 +150,7 @@ extension MinecraftServer.Version: Codable {
 
 // MARK: - Open API Spec
 extension MinecraftServer.Version: OpenAPIDescriptable {
-    static var openAPIDescription: OpenAPIDescriptionType? {
+    static var openAPIDescription: (any OpenAPIDescriptionType)? {
         "Minecraft game version."
     }
 }

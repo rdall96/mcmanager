@@ -6,11 +6,11 @@
 //
 
 import Foundation
-import DockerSwiftAPI
+@preconcurrency import DockerSwiftAPI
 import Logging
 import RegexBuilder
 
-final actor MinecraftServerRuntime: Identifiable {
+final actor MinecraftServerRuntime: Identifiable, Sendable {
     typealias Command = String
     
     private let logger: Logger
@@ -844,7 +844,7 @@ fileprivate enum ServerStatusRegex {
     // thank you https://swiftregex.com for these awesome builder patterns
     
     // Starting server...
-    static let startingRegex: Regex<Substring> = {
+    nonisolated(unsafe) static let startingRegex: Regex<Substring> = {
         Regex {
             "Starting server..."
         }
@@ -852,7 +852,7 @@ fileprivate enum ServerStatusRegex {
     }()
     
     // INFO\]:* Done \((\d+.\d+)s\)!
-    static let runningRegex: Regex<Substring> = {
+    nonisolated(unsafe) static let runningRegex: Regex<Substring> = {
         Regex {
             "INFO]"
             ZeroOrMore {
@@ -870,7 +870,7 @@ fileprivate enum ServerStatusRegex {
     }()
     
     // INFO\]:* Stopping server
-    static let stoppingRegex: Regex<Substring> = {
+    nonisolated(unsafe) static let stoppingRegex: Regex<Substring> = {
         Regex {
             "INFO]"
             ZeroOrMore {

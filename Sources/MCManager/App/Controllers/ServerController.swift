@@ -20,7 +20,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         try await loadExistingServers(from: database)
     }
     
-    func boot(routes: RoutesBuilder) throws {
+    func boot(routes: any RoutesBuilder) throws {
         // V1 APIs
         let servers = routes
             .requireAuthentication()
@@ -404,12 +404,12 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
     private actor ServerStatusCacheManager{
         static let shared = ServerStatusCacheManager()
 
-        typealias RefreshTask = Task<ServerStatusCache, Error>
+        typealias RefreshTask = Task<ServerStatusCache, any Error>
         private var activeRefreshes: [MinecraftServer.IDValue : RefreshTask] = [:]
 
         func serverStatus(
             for serverID: MinecraftServer.IDValue,
-            on database: Database,
+            on database: any Database,
             with settings: Settings,
             manager: MinecraftServerManager
         ) async throws -> ServerStatusCache? {
@@ -563,7 +563,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
         let serverID = try req.serverID
         let fileURL = try await manager.downloadServer(with: serverID)
         let downloadSession = try FileDownloadSession(for: req, url: fileURL)
-        return downloadSession.get()
+        return try await downloadSession.get()
     }
     
     func browseFiles(req: Request) async throws -> FileBrowser {
@@ -631,7 +631,7 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
             throw MinecraftServerError.fileDoesNotExist
         }
         let downloadSession = try FileDownloadSession(for: req, url: fileURL)
-        return downloadSession.get()
+        return try await downloadSession.get()
     }
 
     // MARK: Player management
@@ -805,12 +805,12 @@ struct ServerController: MCManagerAPIRoute, RouteCollection {
 fileprivate extension ServerController {
 
     // Fetch the most up-to-date service settings
-    func settings(on database: Database) async throws -> Settings {
+    func settings(on database: any Database) async throws -> Settings {
         try await Settings.query(on: database).first() ?? .defaults
     }
     
     /// Load all existing servers from the given database into the current runtime
-    func loadExistingServers(from database: Database) async throws {
+    func loadExistingServers(from database: any Database) async throws {
         logger.info("Loading existing servers")
         let servers = try await MinecraftServer.query(on: database).all()
         logger.notice("Found \(servers.count) existing server(s)")
@@ -820,7 +820,7 @@ fileprivate extension ServerController {
     }
 
     /// Wipe the status cache for the given server.
-    func deleteStatusCache(for serverID: MinecraftServer.IDValue, on database: Database) async {
+    func deleteStatusCache(for serverID: MinecraftServer.IDValue, on database: any Database) async {
         do {
             try await ServerStatusCache.find(serverID, on: database)?.delete(on: database)
         }

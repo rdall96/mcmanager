@@ -9,7 +9,7 @@ import Fluent
 
 extension SessionToken {
     
-    static var migrations: [AsyncMigration] {
+    static var migrations: [any AsyncMigration] {
         [CreateTable()]
     }
     

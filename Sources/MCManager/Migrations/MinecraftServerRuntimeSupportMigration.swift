@@ -9,7 +9,7 @@ import Fluent
 
 extension ServerRuntimeSupportCache {
 
-    static var migrations: [AsyncMigration] {
+    static var migrations: [any AsyncMigration] {
         [CreateTable()]
     }
 

@@ -9,7 +9,7 @@ import Foundation
 import Fluent
 import Vapor
 
-final class ServerRuntimeSupportCache: Model, Content {
+final class ServerRuntimeSupportCache: Model, Content, @unchecked Sendable {
     static let schema = "runtime_support"
 
     enum FieldKeys: FieldKey {

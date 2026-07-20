@@ -11,7 +11,7 @@ import VaporToOpenAPI
 
 @OpenAPIDescriptable
 /// Global application settings.
-final class Settings: Model, Content {
+final class Settings: Model, Content, @unchecked Sendable {
     static let schema = "settings"
 
     enum FieldKeys: FieldKey {
@@ -96,7 +96,7 @@ final class Settings: Model, Content {
     }
     
     // override decoding to ensure we do type checking
-    convenience init(from decoder: Decoder) throws {
+    convenience init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.init(
             serverStatusCacheTTLSeconds: try container.decode(UInt.self, forKey: .serverStatusCacheTTLSeconds),
@@ -107,7 +107,7 @@ final class Settings: Model, Content {
     }
     
     // override encoding to ignore the settings id
-    func encode(to encoder: Encoder) throws {
+    func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(serverStatusCacheTTLSeconds, forKey: .serverStatusCacheTTLSeconds)
         try container.encode(serverSupportCacheTTLSeconds, forKey: .serverSupportCacheTTLSeconds)

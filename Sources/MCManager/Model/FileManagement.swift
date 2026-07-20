@@ -10,7 +10,7 @@ import Vapor
 import VaporToOpenAPI
 import Crypto
 import NIOCore
-import Zip
+import ZIPFoundation
 
 @OpenAPIDescriptable
 /// Information about a directory and its contents.
@@ -123,7 +123,8 @@ final class FileUploadSession: @unchecked Sendable {
         }
         
         if isCompressed {
-            let unzipURL = try Zip.quickUnzipFile(fileURL)
+            let unzipURL = URL.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            try FileManager.default.unzipItem(at: fileURL, to: unzipURL)
             try? FileManager.default.removeItem(at: fileURL)
             // If the unzipped path only contains one item assume the whole directory was zipped,
             // and use that as the sourceFileURL
@@ -191,19 +192,12 @@ final class FileDownloadSession {
         
         // If the file is a folder, we should compress it
         if FileManager.default.isDirectory(at: url) {
-            let directoryContents = try FileManager.default.contentsOfDirectory(
-                at: url,
-                includingPropertiesForKeys: nil,
-                options: .skipsHiddenFiles
-            )
             let compressedFileURL = FileManager.default.temporaryDirectory
                 .appendingPathComponent("mcmanager-download-\(request.id)-\(url.lastPathComponent).zip")
-            try Zip.zipFiles(
-                paths: directoryContents,
-                zipFilePath: compressedFileURL,
-                password: nil,
-                compression: .DefaultCompression,
-                progress: nil
+            try FileManager.default.zipItem(
+                at: url,
+                to: compressedFileURL,
+                shouldKeepParent: true,
             )
             self.compressedFileURL = compressedFileURL
         }
@@ -212,10 +206,10 @@ final class FileDownloadSession {
         }
     }
     
-    func get() -> Response {
+    func get() async throws -> Response {
         let downloadURL: URL = compressedFileURL ?? url
-        return request.fileio.streamFile(at: downloadURL.path, mediaType: HTTPMediaType(for: downloadURL)) { _ in
-            if let compressedFileURL = self.compressedFileURL {
+        return try await request.fileio.asyncStreamFile(at: downloadURL.path, mediaType: HTTPMediaType(for: downloadURL)) { [compressedFileURL] _ in
+            if let compressedFileURL {
                 try? FileManager.default.removeItem(at: compressedFileURL)
             }
         }

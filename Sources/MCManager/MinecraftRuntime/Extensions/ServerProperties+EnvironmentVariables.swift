@@ -15,7 +15,7 @@ private enum PropertyValue: Decodable {
     case int(Int)
     case string(String)
 
-    init(from decoder: Decoder) throws {
+    init(from decoder: any Decoder) throws {
         let container = try decoder.singleValueContainer()
         // check bool before int to avoid mis-representing 'true' and 'false' as integer values where they are not supported
         if let value = try? container.decode(Bool.self) {

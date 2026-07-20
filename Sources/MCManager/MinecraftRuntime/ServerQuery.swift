@@ -5,7 +5,7 @@
 //  Created by Ricky Dall'Armellina on 8/17/23.
 //
 
-import Foundation
+import Vapor
 
 // Network is only available on Apple platforms
 #if canImport(Network)
@@ -253,8 +253,8 @@ extension UDPSession {
         case timedOut
         case requestCancelled
         case connectionFailure
-        case sendError(Error)
-        case receiveError(Error?)
+        case sendError(any Error)
+        case receiveError((any Error)?)
     }
 }
 

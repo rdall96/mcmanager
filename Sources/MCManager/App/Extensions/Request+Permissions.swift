@@ -5,9 +5,8 @@
 //  Created by Ricky Dall'Armellina on 10/8/24.
 //
 
-import Foundation
+import Fluent
 import Vapor
-import FluentKit
 
 extension Permissions {
     
@@ -41,7 +40,7 @@ extension Permissions {
     }
 
     /// Read the default permissions from the given database.
-    static func defaults(on db: Database) async throws -> Permissions? {
+    static func defaults(on db: any Database) async throws -> Permissions? {
         try await Permissions.query(on: db)
             .filter(\Permissions.$isDefaults, .equal, true)
             .first()

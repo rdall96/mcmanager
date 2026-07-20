@@ -1,10 +1,11 @@
 //
-//  File.swift
+//  RoleController.swift
 //  MCManager
 //
 //  Created by Ricky Dall'Armellina on 10/7/24.
 //
 
+import Fluent
 import Vapor
 
 struct RoleController: MCManagerAPIRoute, RouteCollection {

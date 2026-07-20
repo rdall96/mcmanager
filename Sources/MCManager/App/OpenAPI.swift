@@ -8,7 +8,7 @@
 import Foundation
 import Fluent
 import Vapor
-import VaporToOpenAPI
+@preconcurrency import VaporToOpenAPI
 
 // MCManager OpenAPI tags
 extension TagObject {
@@ -82,7 +82,7 @@ struct OpenAPIRoutes: RouteCollection {
 
         // Swagger UI
         routes.get("Swagger") { req in
-            req.fileio.streamFile(at: publicDirectoryURL.appendingPathComponent("Swagger/index.html").path)
+            try await req.fileio.asyncStreamFile(at: publicDirectoryURL.appendingPathComponent("Swagger/index.html").path)
         }
         .excludeFromOpenAPI()
 
@@ -714,7 +714,7 @@ extension Route {
         }
 
         // if the request requires any permissions, automatically add an unauthorized response
-        if let permissions {
+        if permissions != nil {
             // FIXME: Add info regarding the actual user permissions required for this action
             route = route.openAPIResponse(.applicationError(UserError.unauthorized))
         }
@@ -747,7 +747,7 @@ extension RoutesBuilder {
     func openAPIMetadata(
         tags: TagObject...,
         requiresAuthentication: Bool = false
-    ) -> RoutesBuilder {
+    ) -> any RoutesBuilder {
         if requiresAuthentication {
             return self.groupedOpenAPI(tags: tags)
                 .groupedOpenAPI(auth: .mcmanagerUserToken)
@@ -760,7 +760,7 @@ extension RoutesBuilder {
 
     /// Add OpenAPI response information to a group of routes.
     @discardableResult
-    func openAPIResponse(_ response: OpenAPIResponse) -> RoutesBuilder {
+    func openAPIResponse(_ response: OpenAPIResponse) -> any RoutesBuilder {
         return self.groupedOpenAPIResponse(
             statusCode: response.statusCode,
             body: response.body,

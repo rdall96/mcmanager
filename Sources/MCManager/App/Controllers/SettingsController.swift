@@ -12,10 +12,8 @@ struct SettingsController: MCManagerAPIRoute, RouteCollection {
     static var supportedAPIVersion: APIVersion { .v1 }
     
     let logger: Logger
-    /// Callback to execute when the settings are updated
-    let onUpdate: (Settings) -> Void
-    
-    func boot(routes: RoutesBuilder) throws {
+
+    func boot(routes: any RoutesBuilder) throws {
         let settings = routes
             .requireAuthentication()
             .apiVersion(.v1)
@@ -66,9 +64,6 @@ struct SettingsController: MCManagerAPIRoute, RouteCollection {
         // save the new settings (this will create a DB entry if it doesn't exist)
         try await settings.save(on: req.db)
         logger.notice("Updated MCManager application settings, a restart might be required")
-        
-        // notify listeners
-        onUpdate(settings)
         
         return .ok
     }

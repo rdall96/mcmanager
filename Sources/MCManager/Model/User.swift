@@ -121,7 +121,7 @@ final class User: Model, Content, @unchecked Sendable {
     // override encoding:
     // * omit the password
     // * translate the admin privileges into a simple flag
-    func encode(to encoder: Encoder) throws {
+    func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(try requireID(), forKey: .id)
         try container.encode(username, forKey: .username)
@@ -175,7 +175,7 @@ extension User {
 
 // MARK: - Open API Spec
 extension User: OpenAPIDescriptable {
-    static var openAPIDescription: OpenAPIDescriptionType? {
+    static var openAPIDescription: (any OpenAPIDescriptionType)? {
         OpenAPIDescription<CodingKeys>("User information.")
             .add(for: .id, "User ID.")
             .add(for: .username, "User name.")
