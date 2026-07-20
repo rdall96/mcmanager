@@ -8,7 +8,7 @@
 import Fluent
 import Vapor
 
-final class ServerStatusCache: Model, Content {
+final class ServerStatusCache: Model, Content, @unchecked Sendable {
     static let schema = "server_status_cache"
     
     enum FieldKeys: FieldKey {

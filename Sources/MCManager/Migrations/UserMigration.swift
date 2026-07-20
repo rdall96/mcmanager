@@ -9,12 +9,12 @@ import Fluent
 
 extension User {
     
-    static var migrations: [AsyncMigration] {
+    static var migrations: [any AsyncMigration] {
         [CreateTable()]
     }
     
     struct CreateTable: AsyncMigration {
-        func prepare(on database: Database) async throws {
+        func prepare(on database: any Database) async throws {
             try await database.schema(User.schema)
                 .id()
                 .field(FieldKeys.username.rawValue, .string, .required)
@@ -28,7 +28,7 @@ extension User {
                 .create()
         }
         
-        func revert(on database: Database) async throws {
+        func revert(on database: any Database) async throws {
             try await database.schema(User.schema).delete()
         }
     }

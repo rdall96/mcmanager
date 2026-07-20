@@ -6,12 +6,13 @@
 //
 
 import Fluent
+import JWT
 import Vapor
 
 struct AuthenticationController: MCManagerAPIRoute, RouteCollection {
     let logger = Logger(label: "mcmanager.auth")
     
-    func boot(routes: RoutesBuilder) throws {
+    func boot(routes: any RoutesBuilder) throws {
         let authRoutes = routes.grouped("auth")
             .openAPIMetadata(tags: .auth)
 
@@ -48,7 +49,7 @@ struct AuthenticationController: MCManagerAPIRoute, RouteCollection {
             throw AuthenticationError.invalidCredentials
         }
         try await payload.save(on: req.db)
-        let token = try req.jwt.sign(payload)
+        let token = try await req.jwt.sign(payload)
         return ClientSession(accessToken: token)
     }
     

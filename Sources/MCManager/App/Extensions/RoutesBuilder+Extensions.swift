@@ -5,7 +5,7 @@
 //  Created by Ricky Dall'Armellina on 9/30/24.
 //
 
-import Foundation
+import Fluent
 import Vapor
 
 extension RoutesBuilder {

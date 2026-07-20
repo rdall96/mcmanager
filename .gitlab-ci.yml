@@ -22,7 +22,7 @@ variables:
   PUBLIC_IMAGE: '$DOCKERHUB_USER/mcmanager'
   # Tool versions, shared across jobs
   DOCKER_VERSION: '28.5.2'
-  SWIFT_VERSION: '5.10-jammy'
+  SWIFT_VERSION: '6.3-noble'
   # docker-in-docker connection settings, shared by every job using the docker:*-dind service
   DOCKER_HOST: "tcp://docker:2376"
   DOCKER_TLS_CERTDIR: "/certs"
@@ -100,7 +100,7 @@ dev:test:oas:
     - shared
   # Plain distro image - no Swift toolchain needed, only running the binary built by dev:build.
   # It's the same Ubuntu release as the swift:$SWIFT_VERSION image so glibc matches.
-  image: ubuntu:22.04
+  image: ubuntu:24.04
   needs:
     # Reuse the binary built by dev:build instead of rebuilding it here
     - dev:build
@@ -109,8 +109,8 @@ dev:test:oas:
     # (openssh-client provides ssh-keygen, used by the app to generate its private key on first run)
     # (tzdata provides the IANA timezone database ISO8601DateFormatter/ICU needs to initialize)
     - export DEBIAN_FRONTEND=noninteractive
-    - apt-get update && apt-get install -y --no-install-recommends curl python3-pip openssh-client tzdata libicu70 libcurl4 libxml2 libsqlite3-0 libatomic1 zlib1g
-    - pip3 install --no-cache-dir openapi-spec-validator
+    - apt-get update && apt-get install -y --no-install-recommends curl python3-pip openssh-client tzdata libicu74 libcurl4t64 libxml2 libsqlite3-0 libatomic1 zlib1g
+    - pip3 install --no-cache-dir --break-system-packages openapi-spec-validator
   script:
     - ./scripts/verify-oas.sh
   artifacts:
@@ -122,10 +122,10 @@ dev:test:oas:
     # Run for pushes to the main branch when source files have changed
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $MAIN_BRANCH
       changes: *source-changes
-      when: always
+      when: on_success
     # Run with every merge request
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      when: always
+      when: on_success
 
 
 # Job: Development Registry Upload
@@ -185,6 +185,7 @@ release:build:
   rules:
     # run this when we have a release tag
     - if: $CI_COMMIT_TAG =~ $RELEASE_TAG
+      when: always
 
 
 # Job: Release OAS Generation
@@ -199,7 +200,7 @@ release:generate:oas:
     # Tooling needed to fetch and validate the OAS
     - export DEBIAN_FRONTEND=noninteractive
     - apt-get update && apt-get install -y --no-install-recommends curl python3-pip
-    - pip3 install --no-cache-dir openapi-spec-validator
+    - pip3 install --no-cache-dir --break-system-packages openapi-spec-validator
   script:
     # Build the app in DEBUG mode - the /oas.json endpoint is only registered in DEBUG builds
     - swift package resolve
@@ -214,6 +215,7 @@ release:generate:oas:
   rules:
     # run this when we have a release tag
     - if: $CI_COMMIT_TAG =~ $RELEASE_TAG
+      when: on_success
 
 
 # Job: Release Docker Hub Upload

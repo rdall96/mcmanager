@@ -6,10 +6,11 @@
 //
 
 import Fluent
+import FluentSQL
 
 extension Permissions {
     
-    static var migrations: [AsyncMigration] {
+    static var migrations: [any AsyncMigration] {
         [CreateTable()]
     }
     

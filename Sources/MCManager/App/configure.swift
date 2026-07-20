@@ -7,7 +7,7 @@ import Vapor
 fileprivate let defaultAPIPort: Int = 8000
 
 // configures your application
-public func configure(_ app: Application) async throws {
+func configure(_ app: Application) async throws {
     // Server name
     app.http.server.configuration.serverName = "MCManager"
     
@@ -103,8 +103,11 @@ fileprivate func setupKeys(_ app: Application) async throws {
         try await app.directory.generateKeys(at: privateKeyPath)
     }
     let key = try String(contentsOfFile: privateKeyPath.path)
-    let keySigner = JWTSigner.hs256(key: key)
-    app.jwt.signers.use(keySigner, kid: .private, isDefault: true)
+    await app.jwt.keys.add(
+        hmac: .init(stringLiteral: key),
+        digestAlgorithm: .sha256,
+        kid: .private
+    )
 }
 
 extension JWKIdentifier {

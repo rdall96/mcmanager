@@ -11,7 +11,7 @@ import Vapor
 import VaporToOpenAPI
 
 /// User role information.
-final class Role: Model, Content {
+final class Role: Model, Content, @unchecked Sendable {
     static let schema = "roles"
     
     enum FieldKeys: FieldKey {
@@ -73,7 +73,7 @@ final class Role: Model, Content {
 
 // MARK: - Open API Spec
 extension Role: OpenAPIDescriptable {
-    static var openAPIDescription: OpenAPIDescriptionType? {
+    static var openAPIDescription: (any OpenAPIDescriptionType)? {
         OpenAPIDescription<CodingKeys>("User role information.")
             .add(for: .id, "Role ID.")
             .add(for: .name, "Role name.")

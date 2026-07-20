@@ -11,7 +11,7 @@ import Vapor
 struct UserController: MCManagerAPIRoute, RouteCollection {
     let logger: Logger
     
-    func boot(routes: RoutesBuilder) throws {
+    func boot(routes: any RoutesBuilder) throws {
         let users = routes
             .requireAuthentication()
             .apiVersion(.v1)

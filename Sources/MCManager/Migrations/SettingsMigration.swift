@@ -6,10 +6,11 @@
 //
 
 import Fluent
+import FluentSQL
 
 extension Settings {
     
-    static var migrations: [AsyncMigration] {
+    static var migrations: [any AsyncMigration] {
         [
             CreateTable(),
             AddServerSupportCacheTTLField()
@@ -17,7 +18,7 @@ extension Settings {
     }
     
     struct CreateTable: AsyncMigration {
-        func prepare(on database: Database) async throws {
+        func prepare(on database: any Database) async throws {
             try await database.schema(Settings.schema)
                 .id()
                 .field(FieldKeys.serverStatusCacheTTLSeconds.rawValue, .uint, .required)
@@ -27,7 +28,7 @@ extension Settings {
                 .create()
         }
         
-        func revert(on database: Database) async throws {
+        func revert(on database: any Database) async throws {
             try await database.schema(Settings.schema).delete()
         }
     }

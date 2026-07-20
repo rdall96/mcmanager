@@ -1,17 +1,17 @@
 //
 //  ServerManager.swift
-//
+//  MCManager
 //
 //  Created by Ricky Dall'Armellina on 7/17/23.
 //
 
+@preconcurrency import DockerSwiftAPI
 import Foundation
-import DockerSwiftAPI
 import Logging
 
 /// Manages Minecraft server runtimes running on the same host.
-final class MinecraftServerManager {
-    
+final class MinecraftServerManager: @unchecked Sendable {
+
     private let serversRoot: URL
     private let logger: Logger
     private var serverRuntimes: [UUID : MinecraftServerRuntime]
@@ -79,7 +79,12 @@ final class MinecraftServerManager {
         }
         return serverRuntime
     }
-    
+
+    /// Fetch a server.
+    func server(with id: MinecraftServer.IDValue) throws -> MinecraftServerRuntime {
+        try requireServer(id: id)
+    }
+
     /// Add a server.
     /// If it doesn't exist, this methods creates the new server.
     func add(server: MinecraftServer) async throws {

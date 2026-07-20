@@ -53,7 +53,7 @@ final class SessionToken: Model, Content, @unchecked Sendable {
     }
     
     /// Create a new token for the given user
-    static func token(for user: User, database: Database? = nil) throws -> SessionToken? {
+    static func token(for user: User, database: (any Database)? = nil) throws -> SessionToken? {
         let currentDate: Date = .now
         let expirationDate = Self.accessExpiration(for: currentDate)
         return try .init(
@@ -94,7 +94,7 @@ extension SessionToken: Authenticatable {}
 
 // MARK: - JWTPayload
 extension SessionToken: JWTPayload {
-    func verify(using signer: JWTSigner) throws {
+    func verify(using algorithm: some JWTAlgorithm) async throws {
         // ensure the JWT is not expired
         try exp.verifyNotExpired()
     }
@@ -106,7 +106,7 @@ extension SessionToken {
         func authenticate(bearer: BearerAuthorization, for request: Request) async throws {
             do {
                 // ensure it's the right type of jwt (this will also ensure it's signed correctly)
-                let jwt = try request.jwt.verify(as: SessionToken.self)
+                let jwt = try await request.jwt.verify(as: SessionToken.self)
                 // ensure this token exists on the database
                 let storedJwt = try await SessionToken.find(jwt.id, on: request.db)
                 guard let storedJwt, try storedJwt.requireID() == jwt.id else {
@@ -132,7 +132,7 @@ extension SessionToken: Encodable {
         case exp
     }
     
-    func encode(to encoder: Encoder) throws {
+    func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: Keys.self)
         try container.encode(try requireID(), forKey: .id)
         try container.encode(sub, forKey: .sub)

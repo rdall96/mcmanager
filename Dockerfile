@@ -1,7 +1,7 @@
 # ================================
 # Build image
 # ================================
-FROM swift:5.10-jammy AS build
+FROM swift:6.3-noble AS build
 
 ARG C_OPTIMIZATION="-O2" \
   BUILD_TYPE="release"
@@ -64,7 +64,7 @@ RUN [ -d /build/Resources ] && { mv /build/Resources ./Resources && chmod -R a-w
 # ================================
 # Run image
 # ================================
-FROM ubuntu:jammy
+FROM ubuntu:noble
 
 ENV MCMANAGER_HOME="/app"
 ENV MCMANAGER_DATA="${MCMANAGER_HOME}/data" \

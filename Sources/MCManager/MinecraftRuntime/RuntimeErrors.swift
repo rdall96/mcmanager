@@ -25,7 +25,7 @@ enum MinecraftServerError: LocalizedError {
     case invalidCommand
     case fileDoesNotExist
     case invalidPlayerAccount
-    case systemError(Error)
+    case systemError(any Error)
 
     var errorDescription: String {
         switch self {

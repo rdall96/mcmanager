@@ -5,6 +5,7 @@
 //  Created by Ricky Dall'Armellina on 7/13/26.
 //
 
+import Fluent
 import Vapor
 import VaporToOpenAPI
 

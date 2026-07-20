@@ -12,7 +12,7 @@ import VaporToOpenAPI
 
 @OpenAPIDescriptable
 /// Permissions to control user access to the API.
-final class Permissions: Model, Content {
+final class Permissions: Model, Content, @unchecked Sendable {
     static let schema = "permissions"
     
     enum FieldKeys: FieldKey {
